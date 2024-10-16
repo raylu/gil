@@ -1,0 +1,18 @@
+[package]
+name = "gil"
+description = "interactive git log"
+version = "0.0.1"
+edition = "2021"
+repository = "https://github.com/raylu/gil"
+readme = "readme.md"
+keywords = ["git-log"]
+categories = ["command-line-utilities"]
+license = "blessing"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi-to-tui = "6"
+crossterm = "0.28"
+git2 = { version = "0.19", default-features = false }
+tui = { version = "0.28", package = "ratatui" }
