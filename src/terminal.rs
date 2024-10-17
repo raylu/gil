@@ -7,7 +7,7 @@ use crossterm::{
 	execute,
 	terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use git2::Repository;
+use git2::{Oid, Repository, Revwalk};
 use std::{
 	error::Error,
 	io::{self, Stdout},
@@ -16,18 +16,31 @@ use tui::{
 	backend::CrosstermBackend,
 	layout::{Constraint, Direction, Layout, Rect, Size},
 	text::{Line, Text},
-	widgets::{Block, Borders, Clear, Paragraph, Wrap},
+	widgets::{Block, Borders, Clear, List, ListState, Paragraph, Wrap},
 	Frame, Terminal,
 };
 
+use crate::git::CommitInfo;
+
 pub struct App<'a> {
 	repo: &'a Repository,
+	commit_id: Oid,
+	commit_infos: Vec<CommitInfo>,
+	revwalk: Revwalk<'a>,
+	log_state: ListState,
 	popup: Option<Text<'static>>,
 }
 
 impl App<'_> {
-	pub fn new<'a>(repo: &'a Repository) -> App<'a> {
-		App { repo, popup: None }
+	pub fn new<'a>(repo: &'a Repository, commit_id: Oid, revwalk: Revwalk<'a>) -> App<'a> {
+		App {
+			repo,
+			commit_id,
+			commit_infos: vec![],
+			revwalk,
+			log_state: ListState::default(),
+			popup: None,
+		}
 	}
 }
 
@@ -126,6 +139,22 @@ fn make_help_text() -> Text<'static> {
 }
 
 fn ui(frame: &mut Frame, app: &mut App) {
+	let area = Rect::new(
+		frame.area().x,
+		frame.area().y,
+		frame.area().width,
+		frame.area().height - 1,
+	);
+
+	let mut height = 0;
+	let commit_info_to_item = |ci: &CommitInfo| -> Line {
+		let line = Line::from(ci.commit_id.to_string());
+		height += 1;
+		return line;
+	};
+	let commit_list = List::new(app.commit_infos.iter().map(commit_info_to_item));
+	frame.render_stateful_widget(commit_list, area, &mut app.log_state);
+
 	if let Some(popup) = &app.popup {
 		let paragraph = Paragraph::new(popup.clone()).wrap(Wrap { trim: false });
 		let area = centered_rect(80, 80, frame.area());
