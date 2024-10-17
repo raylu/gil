@@ -16,11 +16,11 @@ use tui::{
 	backend::CrosstermBackend,
 	layout::{Constraint, Direction, Layout, Rect, Size},
 	text::{Line, Text},
-	widgets::{Block, Borders, Clear, List, ListState, Paragraph, Wrap},
+	widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
 	Frame, Terminal,
 };
 
-use crate::git::CommitInfo;
+use crate::git::{next_commit, CommitInfo};
 
 pub struct App<'a> {
 	repo: &'a Repository,
@@ -147,12 +147,35 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	);
 
 	let mut height = 0;
-	let commit_info_to_item = |ci: &CommitInfo| -> Line {
-		let line = Line::from(ci.commit_id.to_string());
-		height += 1;
-		return line;
+	let commit_info_to_item = |ci: &CommitInfo| -> ListItem {
+		let mut commit_id = ci.commit_id.to_string();
+		commit_id.truncate(8);
+		let lines = vec![
+			Line::from(format!("{} {}", commit_id, ci.author)),
+			Line::from(format!("    {}", ci.summary)),
+		];
+		return lines.into();
 	};
-	let commit_list = List::new(app.commit_infos.iter().map(commit_info_to_item));
+	let mut commit_list_items: Vec<ListItem> = vec![];
+	for commit_info in &app.commit_infos {
+		commit_list_items.push(commit_info_to_item(commit_info));
+		height += 1;
+	}
+	while height < area.height {
+		let commit_info = match next_commit(app.repo, &mut app.revwalk) {
+			Ok(None) => break,
+			Ok(Some(ci)) => ci,
+			Err(err) => {
+				app.popup = Some(err.message().to_owned().into());
+				break;
+			}
+		};
+		let item = commit_info_to_item(&commit_info);
+		height += 1;
+		commit_list_items.push(item);
+		app.commit_infos.push(commit_info);
+	}
+	let commit_list = List::new(commit_list_items);
 	frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 
 	if let Some(popup) = &app.popup {
