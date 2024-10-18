@@ -78,7 +78,7 @@ pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn
 				Err(err) => {
 					app.popup = Some(err.message().to_owned().into());
 					break;
-				}
+				},
 			};
 			app.commit_infos.push(commit_info);
 		}
@@ -88,8 +88,8 @@ pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn
 			match handle_input(&key, &mut app, &terminal.size()?) {
 				Ok(false) => {
 					return Ok(());
-				}
-				Ok(true) => {} // ignored
+				},
+				Ok(true) => {}, // ignored
 				Err(err) => app.popup = Some(format!("{}", err).into()),
 			}
 		}
@@ -128,28 +128,28 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			code: KeyCode::Home, ..
 		} => {
 			// TODO
-		}
+		},
 		KeyEvent { code: Char('G'), .. } | KeyEvent { code: KeyCode::End, .. } => {
 			// TODO
-		}
+		},
 		// other interactions
 		KeyEvent { code: Char('1'), .. } => {
 			app.log_mode = LogMode::Short;
-		}
+		},
 		KeyEvent { code: Char('2'), .. } => {
 			app.log_mode = LogMode::Medium;
-		}
+		},
 		KeyEvent { code: Char('3'), .. } => {
 			app.log_mode = LogMode::Long;
-		}
+		},
 		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_help_text()),
 		KeyEvent {
 			code: Char('q') | KeyCode::Esc,
 			..
 		} => {
 			return Ok(false);
-		}
-		_ => {} // ignored
+		},
+		_ => {}, // ignored
 	};
 	Ok(true)
 }
@@ -160,7 +160,7 @@ fn scroll(app: &mut App, amount: i16) {
 		Some(index) => {
 			let new_index = index.saturating_add_signed(amount.into());
 			app.log_state.select(Some(new_index.clamp(0, app.commit_infos.len() - 1)));
-		}
+		},
 	}
 }
 
@@ -178,7 +178,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	);
 
 	let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
-        .highlight_style(Style::default().bg(Color::Indexed(237))); // 232 is black, 255 is white; 237 is dark gray
+		.highlight_style(Style::default().bg(Color::Indexed(237))); // 232 is black, 255 is white; 237 is dark gray
 	frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 
 	if let Some(popup) = &app.popup {
@@ -199,15 +199,17 @@ fn ui(frame: &mut Frame, app: &mut App) {
 fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode) -> ListItem<'a> {
 	let mut commit_id = ci.commit_id.to_string();
 	commit_id.truncate(8);
-	let mut lines = vec![
-		Line::from(vec![Span::from(commit_id).yellow(), " ".to_span(), ci.author.to_span().light_blue()]),
-	];
+	let mut lines = vec![Line::from(vec![
+		Span::from(commit_id).yellow(),
+		" ".to_span(),
+		ci.author.to_span().light_blue(),
+	])];
 	match log_mode {
 		LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
 		LogMode::Medium | LogMode::Long => {
 			ci.message.lines().for_each(|l| lines.push(Line::from(format!("    {}", l))));
 			lines.push(Line::from(""));
-		}
+		},
 	}
 	if *log_mode == LogMode::Long {
 		lines.extend(ci.stats.iter().map(|sl: &String| Line::from(sl.clone())));

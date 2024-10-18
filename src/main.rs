@@ -16,14 +16,14 @@ fn main() {
 		Err(err) => {
 			println!("{}", err.message());
 			return;
-		}
+		},
 	};
 	let commit_id = match get_commit_id(&repo, &args) {
 		Ok(commit_id) => commit_id,
 		Err(err) => {
 			println!("couldn't get commit: {}", err.message());
 			return;
-		}
+		},
 	};
 
 	let revwalk = match git::log(&repo, commit_id) {
@@ -31,7 +31,7 @@ fn main() {
 		Err(err) => {
 			println!("couldn't log {}: {}", commit_id, err.message());
 			return;
-		}
+		},
 	};
 
 	let app = terminal::App::new(&repo, revwalk);

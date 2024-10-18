@@ -30,7 +30,7 @@ pub fn next_commit<'repo>(
 		Ok(parent) => {
 			tree = parent.tree()?;
 			Some(&tree)
-		}
+		},
 		Err(_) => None,
 	};
 	let patch = repo.diff_tree_to_tree(parent_tree, Some(&commit.tree()?), None)?;
