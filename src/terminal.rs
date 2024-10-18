@@ -70,6 +70,19 @@ pub fn teardown(terminal: &mut CrosstermTerm) {
 
 pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn Error>> {
 	loop {
+		let needed: usize = usize::from(terminal.size()?.height / 2) + app.log_state.offset();
+		while app.commit_infos.len() < needed {
+			let commit_info = match next_commit(app.repo, &mut app.revwalk) {
+				Ok(None) => break,
+				Ok(Some(ci)) => ci,
+				Err(err) => {
+					app.popup = Some(err.message().to_owned().into());
+					break;
+				}
+			};
+			app.commit_infos.push(commit_info);
+		}
+
 		terminal.draw(|frame| ui(frame, &mut app))?;
 		if let Event::Key(key) = event::read()? {
 			match handle_input(&key, &mut app, &terminal.size()?) {
@@ -161,27 +174,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 		frame.area().height - 1,
 	);
 
-	let mut height = 0;
-	let mut commit_list_items: Vec<ListItem> = vec![];
-	for commit_info in &app.commit_infos {
-		commit_list_items.push(commit_info_to_item(commit_info, &app.log_mode));
-		height += 1;
-	}
-	while height < area.height {
-		let commit_info = match next_commit(app.repo, &mut app.revwalk) {
-			Ok(None) => break,
-			Ok(Some(ci)) => ci,
-			Err(err) => {
-				app.popup = Some(err.message().to_owned().into());
-				break;
-			}
-		};
-		let item = commit_info_to_item(&commit_info, &app.log_mode);
-		height += 1;
-		commit_list_items.push(item);
-		app.commit_infos.push(commit_info);
-	}
-	let commit_list = List::new(commit_list_items)
+	let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
         .highlight_style(Style::default().bg(Color::Indexed(237))); // 232 is black, 255 is white; 237 is dark gray
 	frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 
