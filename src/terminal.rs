@@ -15,18 +15,18 @@ use std::{
 use tui::{
 	backend::CrosstermBackend,
 	layout::{Constraint, Direction, Layout, Rect, Size},
-	style::{Color, Style},
-	text::{Line, Text},
+	style::{Color, Style, Stylize as _},
+	text::{Line, Span, Text, ToSpan as _},
 	widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
 	Frame, Terminal,
 };
 
 use crate::git::{next_commit, CommitInfo};
 
-pub struct App<'a> {
-	repo: &'a Repository,
-	commit_infos: Vec<CommitInfo>,
-	revwalk: Revwalk<'a>,
+pub struct App<'repo> {
+	repo: &'repo Repository,
+	commit_infos: Vec<CommitInfo<'repo>>,
+	revwalk: Revwalk<'repo>,
 	log_mode: LogMode,
 	log_state: ListState,
 	popup: Option<Text<'static>>,
@@ -45,9 +45,11 @@ impl App<'_> {
 	}
 }
 
+#[derive(PartialEq)]
 enum LogMode {
 	Short,
 	Medium,
+	Long,
 }
 
 type CrosstermTerm = Terminal<CrosstermBackend<Stdout>>;
@@ -137,6 +139,9 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		KeyEvent { code: Char('2'), .. } => {
 			app.log_mode = LogMode::Medium;
 		}
+		KeyEvent { code: Char('3'), .. } => {
+			app.log_mode = LogMode::Long;
+		}
 		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_help_text()),
 		KeyEvent {
 			code: Char('q') | KeyCode::Esc,
@@ -191,16 +196,22 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	}
 }
 
-fn commit_info_to_item<'a>(ci: &CommitInfo, log_mode: &LogMode) -> ListItem<'a> {
+fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode) -> ListItem<'a> {
 	let mut commit_id = ci.commit_id.to_string();
 	commit_id.truncate(8);
-	let mut lines = vec![Line::from(format!("{} {}", commit_id, ci.author))];
+	let mut lines = vec![
+		Line::from(vec![Span::from(commit_id).yellow(), " ".to_span(), ci.author.to_span().light_blue()]),
+	];
 	match log_mode {
 		LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
-		LogMode::Medium => {
+		LogMode::Medium | LogMode::Long => {
 			ci.message.lines().for_each(|l| lines.push(Line::from(format!("    {}", l))));
 			lines.push(Line::from(""));
 		}
+	}
+	if *log_mode == LogMode::Long {
+		lines.extend(ci.stats.iter().map(|sl: &String| Line::from(sl.clone())));
+		lines.push(Line::from(""));
 	}
 	return lines.into();
 }
