@@ -13,11 +13,7 @@ use std::{
 	io::{self, Stdout},
 };
 use tui::{
-	backend::CrosstermBackend,
-	layout::{Constraint, Direction, Layout, Rect, Size},
-	text::{Line, Text},
-	widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
-	Frame, Terminal,
+	backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect, Size}, style::{Color, Style}, text::{Line, Text}, widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap}, Frame, Terminal
 };
 
 use crate::git::{next_commit, CommitInfo};
@@ -88,20 +84,20 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		KeyEvent {
 			code: Char('j') | KeyCode::Down,
 			..
-		} => scroll(app, term_size, 1),
+		} => scroll(app, 1),
 		KeyEvent {
 			code: Char('k') | KeyCode::Up,
 			..
-		} => scroll(app, term_size, -1),
+		} => scroll(app, -1),
 		KeyEvent { code: Char('d'), .. }
 		| KeyEvent {
 			code: KeyCode::PageDown,
 			..
-		} => scroll(app, term_size, (term_size.height / 2).try_into().unwrap()),
+		} => scroll(app, (term_size.height / 2).try_into().unwrap()),
 		KeyEvent { code: Char('u'), .. }
 		| KeyEvent {
 			code: KeyCode::PageUp, ..
-		} => scroll(app, term_size, -i16::try_from(term_size.height / 2).unwrap()),
+		} => scroll(app, -i16::try_from(term_size.height / 2).unwrap()),
 		KeyEvent { code: Char('g'), .. }
 		| KeyEvent {
 			code: KeyCode::Home, ..
@@ -129,8 +125,14 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	Ok(true)
 }
 
-fn scroll(app: &mut App, term_size: &Size, amount: i16) {
-	// TODO
+fn scroll(app: &mut App, amount: i16) {
+	match app.log_state.selected() {
+		None => app.log_state.select(Some(0)),
+		Some(index) => {
+			let new_index = index.saturating_add_signed(amount.into());
+			app.log_state.select(Some(new_index.clamp(0, app.commit_infos.len() - 1)));
+		}
+	}
 }
 
 fn make_help_text() -> Text<'static> {
@@ -175,7 +177,8 @@ fn ui(frame: &mut Frame, app: &mut App) {
 		commit_list_items.push(item);
 		app.commit_infos.push(commit_info);
 	}
-	let commit_list = List::new(commit_list_items);
+	let commit_list = List::new(commit_list_items)
+        .highlight_style(Style::default().bg(Color::Indexed(237))); // 232 is black, 255 is white; 237 is dark gray
 	frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 
 	if let Some(popup) = &app.popup {
