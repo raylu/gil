@@ -16,3 +16,6 @@ ansi-to-tui = "6"
 crossterm = "0.28"
 git2 = { version = "0.19", default-features = false }
 tui = { version = "0.28", package = "ratatui" }
+
+[lints.clippy]
+needless_return = "allow"

@@ -44,7 +44,7 @@ fn main() {
 	}
 }
 
-fn get_commit_id(repo: &Repository, args: &Vec<String>) -> Result<Oid, git2::Error> {
+fn get_commit_id(repo: &Repository, args: &[String]) -> Result<Oid, git2::Error> {
 	if args.len() == 2 {
 		Ok(repo.revparse_single(&args[1])?.id())
 	} else {
