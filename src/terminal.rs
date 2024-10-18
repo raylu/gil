@@ -7,7 +7,7 @@ use crossterm::{
 	execute,
 	terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use git2::{Oid, Repository, Revwalk};
+use git2::{Repository, Revwalk};
 use std::{
 	error::Error,
 	io::{self, Stdout},
@@ -25,7 +25,6 @@ use crate::git::{next_commit, CommitInfo};
 
 pub struct App<'a> {
 	repo: &'a Repository,
-	commit_id: Oid,
 	commit_infos: Vec<CommitInfo>,
 	revwalk: Revwalk<'a>,
 	log_mode: LogMode,
@@ -34,10 +33,9 @@ pub struct App<'a> {
 }
 
 impl App<'_> {
-	pub fn new<'a>(repo: &'a Repository, commit_id: Oid, revwalk: Revwalk<'a>) -> App<'a> {
+	pub fn new<'a>(repo: &'a Repository, revwalk: Revwalk<'a>) -> App<'a> {
 		App {
 			repo,
-			commit_id,
 			commit_infos: vec![],
 			revwalk,
 			log_mode: LogMode::Short,

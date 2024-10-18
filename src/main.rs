@@ -34,7 +34,7 @@ fn main() {
 		}
 	};
 
-	let app = terminal::App::new(&repo, commit_id, revwalk);
+	let app = terminal::App::new(&repo, revwalk);
 	let mut term = terminal::setup().unwrap();
 	let res = terminal::run_app(&mut term, app);
 
