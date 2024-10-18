@@ -13,7 +13,12 @@ use std::{
 	io::{self, Stdout},
 };
 use tui::{
-	backend::CrosstermBackend, layout::{Constraint, Direction, Layout, Rect, Size}, style::{Color, Style}, text::{Line, Text}, widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap}, Frame, Terminal
+	backend::CrosstermBackend,
+	layout::{Constraint, Direction, Layout, Rect, Size},
+	style::{Color, Style},
+	text::{Line, Text},
+	widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap},
+	Frame, Terminal,
 };
 
 use crate::git::{next_commit, CommitInfo};
@@ -23,6 +28,7 @@ pub struct App<'a> {
 	commit_id: Oid,
 	commit_infos: Vec<CommitInfo>,
 	revwalk: Revwalk<'a>,
+	log_mode: LogMode,
 	log_state: ListState,
 	popup: Option<Text<'static>>,
 }
@@ -34,10 +40,16 @@ impl App<'_> {
 			commit_id,
 			commit_infos: vec![],
 			revwalk,
+			log_mode: LogMode::Short,
 			log_state: ListState::default(),
 			popup: None,
 		}
 	}
+}
+
+enum LogMode {
+	Short,
+	Medium,
 }
 
 type CrosstermTerm = Terminal<CrosstermBackend<Stdout>>;
@@ -108,10 +120,11 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			// TODO
 		}
 		// other interactions
-		KeyEvent {
-			code: KeyCode::Enter, ..
-		} => {
-			// TODO
+		KeyEvent { code: Char('1'), .. } => {
+			app.log_mode = LogMode::Short;
+		}
+		KeyEvent { code: Char('2'), .. } => {
+			app.log_mode = LogMode::Medium;
 		}
 		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_help_text()),
 		KeyEvent {
@@ -152,10 +165,14 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	let commit_info_to_item = |ci: &CommitInfo| -> ListItem {
 		let mut commit_id = ci.commit_id.to_string();
 		commit_id.truncate(8);
-		let lines = vec![
-			Line::from(format!("{} {}", commit_id, ci.author)),
-			Line::from(format!("    {}", ci.summary)),
-		];
+		let mut lines = vec![Line::from(format!("{} {}", commit_id, ci.author))];
+		match app.log_mode {
+			LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
+			LogMode::Medium => {
+				ci.message.lines().for_each(|l| lines.push(Line::from(format!("    {}", l))));
+				lines.push(Line::from(""));
+			}
+		}
 		return lines.into();
 	};
 	let mut commit_list_items: Vec<ListItem> = vec![];

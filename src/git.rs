@@ -4,6 +4,7 @@ pub struct CommitInfo {
 	pub commit_id: Oid,
 	pub author: String,
 	pub summary: String,
+	pub message: String,
 }
 
 pub fn log(repo: &Repository, commit_id: Oid) -> Result<Revwalk, git2::Error> {
@@ -27,5 +28,6 @@ pub fn next_commit(repo: &Repository, revwalk: &mut Revwalk) -> Result<Option<Co
 			author.email().unwrap_or_default()
 		),
 		summary: commit.summary().unwrap_or_default().to_owned(),
+		message: commit.message().unwrap_or_default().to_owned(),
 	}));
 }
