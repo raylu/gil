@@ -162,22 +162,9 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	);
 
 	let mut height = 0;
-	let commit_info_to_item = |ci: &CommitInfo| -> ListItem {
-		let mut commit_id = ci.commit_id.to_string();
-		commit_id.truncate(8);
-		let mut lines = vec![Line::from(format!("{} {}", commit_id, ci.author))];
-		match app.log_mode {
-			LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
-			LogMode::Medium => {
-				ci.message.lines().for_each(|l| lines.push(Line::from(format!("    {}", l))));
-				lines.push(Line::from(""));
-			}
-		}
-		return lines.into();
-	};
 	let mut commit_list_items: Vec<ListItem> = vec![];
 	for commit_info in &app.commit_infos {
-		commit_list_items.push(commit_info_to_item(commit_info));
+		commit_list_items.push(commit_info_to_item(commit_info, &app.log_mode));
 		height += 1;
 	}
 	while height < area.height {
@@ -189,7 +176,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 				break;
 			}
 		};
-		let item = commit_info_to_item(&commit_info);
+		let item = commit_info_to_item(&commit_info, &app.log_mode);
 		height += 1;
 		commit_list_items.push(item);
 		app.commit_infos.push(commit_info);
@@ -211,6 +198,20 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			}),
 		);
 	}
+}
+
+fn commit_info_to_item<'a>(ci: &CommitInfo, log_mode: &LogMode) -> ListItem<'a> {
+	let mut commit_id = ci.commit_id.to_string();
+	commit_id.truncate(8);
+	let mut lines = vec![Line::from(format!("{} {}", commit_id, ci.author))];
+	match log_mode {
+		LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
+		LogMode::Medium => {
+			ci.message.lines().for_each(|l| lines.push(Line::from(format!("    {}", l))));
+			lines.push(Line::from(""));
+		}
+	}
+	return lines.into();
 }
 
 // from https://github.com/tui-rs-revival/ratatui/blob/main/examples/popup.rs
