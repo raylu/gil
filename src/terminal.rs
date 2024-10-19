@@ -21,7 +21,7 @@ use tui::{
 	Frame, Terminal,
 };
 
-use crate::git::{next_commit, CommitInfo};
+use crate::git::{next_commit, show, CommitInfo};
 
 pub struct App<'repo> {
 	repo: &'repo Repository,
@@ -36,6 +36,7 @@ pub struct App<'repo> {
 struct CommitView {
 	index: usize,
 	files_state: ListState,
+	show_file: Option<Text<'static>>,
 }
 
 impl App<'_> {
@@ -132,6 +133,16 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				};
 			},
 			KeyEvent {
+				code: KeyCode::Enter, ..
+			} => {
+				if let Some(index) = show_commit.files_state.selected() {
+					let commit = &app.commit_infos[show_commit.index];
+					if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
+						show_commit.show_file = Some(show(app.repo, commit.commit_id, path));
+					}
+				}
+			},
+			KeyEvent {
 				code: Char('q') | KeyCode::Esc,
 				..
 			} => {
@@ -184,6 +195,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				app.show_commit = Some(CommitView {
 					index,
 					files_state: ListState::default(),
+					show_file: None,
 				});
 			}
 		},
@@ -244,7 +256,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 				);
 			}
 		},
-		Some(ref mut commit_view) => {
+		Some(ref mut show_commit) => {
 			// show view
 			let cap_direction = if area.width / 2 > area.height {
 				Direction::Horizontal
@@ -259,7 +271,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 				.direction(Direction::Vertical)
 				.constraints(Constraint::from_percentages([50, 50]))
 				.split(commit_and_patch[0]);
-			let commit = &app.commit_infos[commit_view.index];
+			let commit = &app.commit_infos[show_commit.index];
 
 			let commit_message = Paragraph::new(commit.message.clone())
 				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()));
@@ -267,12 +279,21 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
 			let mut commit_file_items = vec![];
 			for delta in commit.patch.deltas() {
-				if let Some(file_path) = delta.new_file().path() {
-					commit_file_items.push(file_path.to_string_lossy());
-				}
+				commit_file_items.push(match delta.new_file().path() {
+					Some(file_path) => file_path.to_string_lossy(),
+					None => "".into(),
+				});
 			}
 			let commit_files = List::new(commit_file_items).highlight_style(highlight_style);
-			frame.render_stateful_widget(commit_files, message_and_files[1], &mut commit_view.files_state);
+			frame.render_stateful_widget(commit_files, message_and_files[1], &mut show_commit.files_state);
+
+			frame.render_widget(Clear, commit_and_patch[1]); // TODO
+			if let Some(show_file) = &mut show_commit.show_file {
+				frame.render_widget(
+					Paragraph::new(show_file.clone()).wrap(Wrap { trim: false }),
+					commit_and_patch[1],
+				);
+			}
 		},
 	}
 }

@@ -1,4 +1,8 @@
+use std::{ffi::OsString, path::Path, process};
+
+use ansi_to_tui::IntoText;
 use git2::{Diff, DiffStatsFormat, Oid, Repository, Revwalk};
+use tui::text::Text;
 
 pub struct CommitInfo<'repo> {
 	pub commit_id: Oid,
@@ -60,4 +64,35 @@ pub fn next_commit<'repo>(
 		patch,
 		stats,
 	}));
+}
+
+pub fn show(repo: &Repository, commit_id: Oid, file_path: &Path) -> Text<'static> {
+	let repo_path = repo.workdir().unwrap();
+	let output = process::Command::new("git")
+		.args([
+			OsString::from("show").as_os_str(),
+			OsString::from("--format=").as_os_str(),
+			OsString::from("--color=always").as_os_str(),
+			OsString::from(commit_id.to_string()).as_os_str(),
+			file_path.as_os_str(),
+		])
+		.current_dir(repo_path)
+		.output();
+
+	let buf = match output {
+		Ok(o) => {
+			if o.status.success() {
+				o.stdout
+			} else {
+				o.stderr
+			}
+		},
+		Err(e) => {
+			return Text::raw(e.to_string());
+		},
+	};
+	match buf.into_text() {
+		Ok(t) => t,
+		Err(e) => Text::raw(format!("ansi_to_tui:\n{}", e)),
+	}
 }
