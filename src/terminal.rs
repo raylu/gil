@@ -306,10 +306,12 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			let commit_files = List::new(commit_file_items).highlight_style(highlight_style);
 			frame.render_stateful_widget(commit_files, message_and_files[1], &mut show_commit.files_state);
 
-			frame.render_widget(Clear, commit_and_patch[1]); // TODO
 			if let Some(show_file) = &mut show_commit.show_file {
 				frame.render_widget(
-					Paragraph::new(show_file.contents.clone()).wrap(Wrap { trim: false }).scroll((show_file.scroll, 0)),
+					Paragraph::new(show_file.contents.clone())
+						.wrap(Wrap { trim: false })
+						.scroll((show_file.scroll, 0))
+						.block(Block::bordered()),
 					commit_and_patch[1],
 				);
 			}

@@ -1,4 +1,8 @@
-use std::{ffi::OsString, path::Path, process};
+use std::{
+	ffi::OsString,
+	path::Path,
+	process::{Command, Stdio},
+};
 
 use ansi_to_tui::IntoText;
 use git2::{Diff, DiffStatsFormat, Oid, Repository, Revwalk};
@@ -68,18 +72,26 @@ pub fn next_commit<'repo>(
 
 pub fn show(repo: &Repository, commit_id: Oid, file_path: &Path) -> Text<'static> {
 	let repo_path = repo.workdir().unwrap();
-	let output = process::Command::new("git")
+	let git_show = match Command::new("git")
 		.args([
 			OsString::from("show").as_os_str(),
 			OsString::from("--format=").as_os_str(),
 			OsString::from("--color=always").as_os_str(),
+			OsString::from("--expand-tabs=4").as_os_str(),
 			OsString::from(commit_id.to_string()).as_os_str(),
 			file_path.as_os_str(),
 		])
 		.current_dir(repo_path)
-		.output();
+		.stdout(Stdio::piped())
+		.spawn()
+	{
+		Ok(proc) => proc,
+		Err(e) => return Text::raw(format!("git show: {}", e)),
+	};
+	let mut delta = Command::new("delta");
+	delta.stdin(Stdio::from(git_show.stdout.unwrap()));
 
-	let buf = match output {
+	let buf = match delta.output() {
 		Ok(o) => {
 			if o.status.success() {
 				o.stdout
