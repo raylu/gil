@@ -127,10 +127,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		| KeyEvent {
 			code: KeyCode::Home, ..
 		} => {
-			// TODO
-		},
-		KeyEvent { code: Char('G'), .. } | KeyEvent { code: KeyCode::End, .. } => {
-			// TODO
+			app.log_state.select_first();
 		},
 		// other interactions
 		KeyEvent { code: Char('1'), .. } => {
@@ -202,7 +199,10 @@ fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode) -> ListItem<'
 	let mut lines = vec![Line::from(vec![
 		Span::from(commit_id).yellow(),
 		" ".to_span(),
-		ci.author.to_span().light_blue(),
+		ci.time.to_span().green(),
+		" ".to_span(),
+		ci.author_name.to_span().light_blue().bold(),
+		Span::from(format!(" <{}>", ci.author_email)).blue(),
 	])];
 	match log_mode {
 		LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),

@@ -1,8 +1,11 @@
 use git2::{Diff, DiffStatsFormat, Oid, Repository, Revwalk};
 
-#[allow(dead_code)] pub struct CommitInfo<'repo> {
+#[allow(dead_code)]
+pub struct CommitInfo<'repo> {
 	pub commit_id: Oid,
-	pub author: String,
+	pub author_name: String,
+	pub author_email: String,
+	pub time: String,
 	pub summary: String,
 	pub message: String,
 	pub patch: Diff<'repo>,
@@ -25,6 +28,11 @@ pub fn next_commit<'repo>(
 	};
 	let commit = repo.find_commit(commit_id)?;
 	let author = commit.author();
+	let time = match chrono::DateTime::from_timestamp(commit.time().seconds(), 0) {
+		Some(dt) => format!("{}", dt.with_timezone(&chrono::Local).format("%c")),
+		None => "".to_string(),
+	};
+
 	let tree: git2::Tree;
 	let parent_tree = match commit.parent(0) {
 		Ok(parent) => {
@@ -42,13 +50,12 @@ pub fn next_commit<'repo>(
 		.lines()
 		.map(|line| line.to_owned())
 		.collect();
+
 	return Ok(Some(CommitInfo {
 		commit_id,
-		author: format!(
-			"{} <{}>",
-			author.name().unwrap_or_default(),
-			author.email().unwrap_or_default()
-		),
+		author_name: author.name().unwrap_or_default().to_owned(),
+		author_email: author.email().unwrap_or_default().to_owned(),
+		time,
 		summary: commit.summary().unwrap_or_default().to_owned(),
 		message: commit.message().unwrap_or_default().to_owned(),
 		patch,
