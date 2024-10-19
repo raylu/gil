@@ -36,7 +36,11 @@ pub struct App<'repo> {
 struct CommitView {
 	index: usize,
 	files_state: ListState,
-	show_file: Option<Text<'static>>,
+	show_file: Option<FileView>,
+}
+
+struct FileView {
+	contents: Text<'static>,
 }
 
 impl App<'_> {
@@ -117,28 +121,20 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			KeyEvent {
 				code: Char('j') | KeyCode::Down,
 				..
-			} => {
-				match show_commit.files_state.selected() {
-					None => show_commit.files_state.select(Some(0)),
-					Some(_) => show_commit.files_state.scroll_down_by(1),
-				};
-			},
+			} => scroll(&mut show_commit.files_state, 1),
 			KeyEvent {
 				code: Char('k') | KeyCode::Up,
 				..
-			} => {
-				match show_commit.files_state.selected() {
-					None => show_commit.files_state.select(Some(0)),
-					Some(_) => show_commit.files_state.scroll_up_by(1),
-				};
-			},
+			} => scroll(&mut show_commit.files_state, -1),
 			KeyEvent {
 				code: KeyCode::Enter, ..
 			} => {
 				if let Some(index) = show_commit.files_state.selected() {
 					let commit = &app.commit_infos[show_commit.index];
 					if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
-						show_commit.show_file = Some(show(app.repo, commit.commit_id, path));
+						show_commit.show_file = Some(FileView {
+							contents: show(app.repo, commit.commit_id, path),
+						});
 					}
 				}
 			},
@@ -158,20 +154,20 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		KeyEvent {
 			code: Char('j') | KeyCode::Down,
 			..
-		} => scroll(app, 1),
+		} => scroll(&mut app.log_state, 1),
 		KeyEvent {
 			code: Char('k') | KeyCode::Up,
 			..
-		} => scroll(app, -1),
+		} => scroll(&mut app.log_state, -1),
 		KeyEvent { code: Char('d'), .. }
 		| KeyEvent {
 			code: KeyCode::PageDown,
 			..
-		} => scroll(app, (term_size.height / 2).try_into().unwrap()),
+		} => scroll(&mut app.log_state, (term_size.height / 2).try_into().unwrap()),
 		KeyEvent { code: Char('u'), .. }
 		| KeyEvent {
 			code: KeyCode::PageUp, ..
-		} => scroll(app, -i16::try_from(term_size.height / 2).unwrap()),
+		} => scroll(&mut app.log_state, -i16::try_from(term_size.height / 2).unwrap()),
 		KeyEvent { code: Char('g'), .. }
 		| KeyEvent {
 			code: KeyCode::Home, ..
@@ -211,12 +207,12 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	Ok(true)
 }
 
-fn scroll(app: &mut App, amount: i16) {
-	match app.log_state.selected() {
-		None => app.log_state.select(Some(0)),
+fn scroll(list_state: &mut ListState, amount: i16) {
+	match list_state.selected() {
+		None => list_state.select(Some(0)),
 		Some(index) => {
 			let new_index = index.saturating_add_signed(amount.into());
-			app.log_state.select(Some(new_index.clamp(0, app.commit_infos.len() - 1)));
+			list_state.select(Some(new_index.max(0)));
 		},
 	}
 }
@@ -290,7 +286,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			frame.render_widget(Clear, commit_and_patch[1]); // TODO
 			if let Some(show_file) = &mut show_commit.show_file {
 				frame.render_widget(
-					Paragraph::new(show_file.clone()).wrap(Wrap { trim: false }),
+					Paragraph::new(show_file.contents.clone()).wrap(Wrap { trim: false }),
 					commit_and_patch[1],
 				);
 			}
