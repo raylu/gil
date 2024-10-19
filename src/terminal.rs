@@ -41,6 +41,7 @@ struct CommitView {
 
 struct FileView {
 	contents: Text<'static>,
+	scroll: u16,
 }
 
 impl App<'_> {
@@ -117,6 +118,27 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	}
 
 	if let Some(ref mut show_commit) = app.show_commit {
+		if let Some(ref mut show_file) = show_commit.show_file {
+			match key {
+				KeyEvent {
+					code: Char('j') | KeyCode::Down,
+					..
+				} => show_file.scroll = show_file.scroll.saturating_add(1),
+				KeyEvent {
+					code: Char('k') | KeyCode::Up,
+					..
+				} => show_file.scroll = show_file.scroll.saturating_sub(1),
+				KeyEvent {
+					code: Char('q') | KeyCode::Esc,
+					..
+				} => {
+					show_commit.show_file = None;
+				},
+				_ => {}, // ignored
+			}
+			return Ok(true);
+		}
+
 		match key {
 			KeyEvent {
 				code: Char('j') | KeyCode::Down,
@@ -134,6 +156,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 					if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
 						show_commit.show_file = Some(FileView {
 							contents: show(app.repo, commit.commit_id, path),
+							scroll: 0,
 						});
 					}
 				}
@@ -286,7 +309,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			frame.render_widget(Clear, commit_and_patch[1]); // TODO
 			if let Some(show_file) = &mut show_commit.show_file {
 				frame.render_widget(
-					Paragraph::new(show_file.contents.clone()).wrap(Wrap { trim: false }),
+					Paragraph::new(show_file.contents.clone()).wrap(Wrap { trim: false }).scroll((show_file.scroll, 0)),
 					commit_and_patch[1],
 				);
 			}
