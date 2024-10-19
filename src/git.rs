@@ -1,6 +1,6 @@
 use git2::{Diff, DiffStatsFormat, Oid, Repository, Revwalk};
 
-pub struct CommitInfo<'repo> {
+#[allow(dead_code)] pub struct CommitInfo<'repo> {
 	pub commit_id: Oid,
 	pub author: String,
 	pub summary: String,
