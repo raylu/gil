@@ -29,6 +29,8 @@ pub struct App<'repo> {
 	revwalk: Revwalk<'repo>,
 	log_mode: LogMode,
 	log_state: ListState,
+	show_commit: Option<usize>,
+	commit_state: ListState,
 	popup: Option<Text<'static>>,
 }
 
@@ -40,6 +42,8 @@ impl App<'_> {
 			revwalk,
 			log_mode: LogMode::Short,
 			log_state: ListState::default(),
+			show_commit: None,
+			commit_state: ListState::default(),
 			popup: None,
 		}
 	}
@@ -104,6 +108,20 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		return Ok(true);
 	}
 
+	if app.show_commit.is_some() {
+		match key {
+			KeyEvent {
+				code: Char('q') | KeyCode::Esc,
+				..
+			} => {
+				app.show_commit = None;
+				app.commit_state = ListState::default();
+			},
+			_ => {}, // ignored
+		}
+		return Ok(true);
+	}
+
 	match key {
 		// scroll
 		KeyEvent {
@@ -138,6 +156,13 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		},
 		KeyEvent { code: Char('3'), .. } => {
 			app.log_mode = LogMode::Long;
+		},
+		KeyEvent {
+			code: KeyCode::Enter, ..
+		} => {
+			if let Some(index) = app.log_state.selected() {
+				app.show_commit = Some(index);
+			}
 		},
 		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_help_text()),
 		KeyEvent {
@@ -174,22 +199,57 @@ fn ui(frame: &mut Frame, app: &mut App) {
 		frame.area().height - 1,
 	);
 
-	let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
-		.highlight_style(Style::default().bg(Color::Indexed(237))); // 232 is black, 255 is white; 237 is dark gray
-	frame.render_stateful_widget(commit_list, area, &mut app.log_state);
+	match app.show_commit {
+		None => {
+			// log view
+			let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
+				.highlight_style(Style::default().bg(Color::Indexed(237))); // 232 is black, 255 is white; 237 is dark gray
+			frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 
-	if let Some(popup) = &app.popup {
-		let paragraph = Paragraph::new(popup.clone()).wrap(Wrap { trim: false });
-		let area = centered_rect(80, 80, frame.area());
-		frame.render_widget(Clear, area);
-		frame.render_widget(Block::default().borders(Borders::all()), area);
-		frame.render_widget(
-			paragraph,
-			area.inner(tui::layout::Margin {
-				vertical: 2,
-				horizontal: 3,
-			}),
-		);
+			if let Some(popup) = &app.popup {
+				let paragraph = Paragraph::new(popup.clone()).wrap(Wrap { trim: false });
+				let area = centered_rect(80, 80, frame.area());
+				frame.render_widget(Clear, area);
+				frame.render_widget(Block::default().borders(Borders::all()), area);
+				frame.render_widget(
+					paragraph,
+					area.inner(tui::layout::Margin {
+						vertical: 2,
+						horizontal: 3,
+					}),
+				);
+			}
+		},
+		Some(commit_index) => {
+			// show view
+			let cap_direction = if area.width / 2 > area.height {
+				Direction::Horizontal
+			} else {
+				Direction::Vertical
+			};
+			let commit_and_patch = Layout::default()
+				.constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+				.direction(cap_direction)
+				.split(area);
+			let message_and_files = Layout::default()
+				.direction(Direction::Vertical)
+				.constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
+				.split(commit_and_patch[0]);
+			let commit = &app.commit_infos[commit_index];
+
+			let commit_message = Paragraph::new(commit.message.clone())
+				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()));
+			frame.render_widget(commit_message, message_and_files[0]);
+
+			let mut commit_file_items = vec![];
+			for delta in commit.patch.deltas() {
+				if let Some(file_path) = delta.new_file().path() {
+					commit_file_items.push(file_path.to_string_lossy());
+				}
+			}
+			let commit_files = List::new(commit_file_items);
+			frame.render_stateful_widget(commit_files, message_and_files[1], &mut app.commit_state);
+		},
 	}
 }
 
