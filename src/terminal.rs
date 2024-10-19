@@ -123,11 +123,11 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				KeyEvent {
 					code: Char('j') | KeyCode::Down,
 					..
-				} => show_file.scroll = show_file.scroll.saturating_add(1),
+				} => scroll_file(show_file, term_size, 1),
 				KeyEvent {
 					code: Char('k') | KeyCode::Up,
 					..
-				} => show_file.scroll = show_file.scroll.saturating_sub(1),
+				} => scroll_file(show_file, term_size, -1),
 				KeyEvent {
 					code: Char('q') | KeyCode::Esc,
 					..
@@ -238,6 +238,10 @@ fn scroll(list_state: &mut ListState, amount: i16) {
 			list_state.select(Some(new_index.max(0)));
 		},
 	}
+}
+fn scroll_file(show_file: &mut FileView, term_size: &Size, amount: i16) {
+	let max = u16::try_from(show_file.contents.height()).unwrap_or(u16::MAX).saturating_sub(term_size.height / 3);
+	show_file.scroll = show_file.scroll.saturating_add_signed(amount).clamp(0, max);
 }
 
 fn make_help_text() -> Text<'static> {
