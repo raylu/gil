@@ -36,7 +36,7 @@ pub struct App<'repo> {
 struct CommitView {
 	index: usize,
 	files_state: ListState,
-	show_file: Option<FileView>,
+	file_view: Option<FileView>,
 }
 
 struct FileView {
@@ -54,6 +54,23 @@ impl App<'_> {
 			log_state: ListState::default(),
 			show_commit: None,
 			popup: None,
+		}
+	}
+
+	fn show_commit_file(&mut self, index: usize) {
+		let show_commit = self.show_commit.as_mut().unwrap();
+		show_commit.show_file(self.repo, &self.commit_infos, index);
+	}
+}
+
+impl CommitView {
+	fn show_file(&mut self, repo: &Repository, commit_infos: &[CommitInfo], index: usize) {
+		let commit = &commit_infos[self.index];
+		if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
+			self.file_view = Some(FileView {
+				contents: show(repo, commit.commit_id, path),
+				scroll: 0,
+			});
 		}
 	}
 }
@@ -118,47 +135,28 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	}
 
 	if let Some(ref mut show_commit) = app.show_commit {
-		if let Some(ref mut show_file) = show_commit.show_file {
-			match key {
-				KeyEvent {
-					code: Char('j') | KeyCode::Down,
-					..
-				} => scroll_file(show_file, term_size, 1),
-				KeyEvent {
-					code: Char('k') | KeyCode::Up,
-					..
-				} => scroll_file(show_file, term_size, -1),
-				KeyEvent {
-					code: Char('q') | KeyCode::Esc,
-					..
-				} => {
-					show_commit.show_file = None;
-				},
-				_ => {}, // ignored
-			}
-			return Ok(true);
-		}
-
 		match key {
 			KeyEvent {
 				code: Char('j') | KeyCode::Down,
 				..
-			} => scroll(&mut show_commit.files_state, 1),
+			} => scroll_file(&mut show_commit.file_view, term_size, 1),
 			KeyEvent {
 				code: Char('k') | KeyCode::Up,
+				..
+			} => scroll_file(&mut show_commit.file_view, term_size, -1),
+			KeyEvent {
+				code: Char('n'),
+				..
+			} => scroll(&mut show_commit.files_state, 1),
+			KeyEvent {
+				code: Char('p'),
 				..
 			} => scroll(&mut show_commit.files_state, -1),
 			KeyEvent {
 				code: KeyCode::Enter, ..
 			} => {
 				if let Some(index) = show_commit.files_state.selected() {
-					let commit = &app.commit_infos[show_commit.index];
-					if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
-						show_commit.show_file = Some(FileView {
-							contents: show(app.repo, commit.commit_id, path),
-							scroll: 0,
-						});
-					}
+					app.show_commit_file(index);
 				}
 			},
 			KeyEvent {
@@ -228,7 +226,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				app.show_commit = Some(CommitView {
 					index,
 					files_state,
-					show_file,
+					file_view: show_file,
 				});
 			}
 		},
@@ -253,9 +251,11 @@ fn scroll(list_state: &mut ListState, amount: i16) {
 		},
 	}
 }
-fn scroll_file(show_file: &mut FileView, term_size: &Size, amount: i16) {
-	let max = u16::try_from(show_file.contents.height()).unwrap_or(u16::MAX).saturating_sub(term_size.height / 3);
-	show_file.scroll = show_file.scroll.saturating_add_signed(amount).clamp(0, max);
+fn scroll_file(show_file_option: &mut Option<FileView>, term_size: &Size, amount: i16) {
+	if let Some(ref mut show_file) = show_file_option {
+		let max = u16::try_from(show_file.contents.height()).unwrap_or(u16::MAX).saturating_sub(term_size.height / 3);
+		show_file.scroll = show_file.scroll.saturating_add_signed(amount).clamp(0, max);
+	}
 }
 
 fn make_help_text() -> Text<'static> {
@@ -324,7 +324,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			let commit_files = List::new(commit_file_items).highlight_style(highlight_style);
 			frame.render_stateful_widget(commit_files, message_and_files[1], &mut show_commit.files_state);
 
-			if let Some(show_file) = &mut show_commit.show_file {
+			if let Some(show_file) = &mut show_commit.file_view {
 				frame.render_widget(
 					Paragraph::new(show_file.contents.clone())
 						.wrap(Wrap { trim: false })
