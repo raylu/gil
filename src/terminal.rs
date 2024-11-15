@@ -211,10 +211,24 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			code: KeyCode::Enter, ..
 		} => {
 			if let Some(index) = app.log_state.selected() {
+				let mut files_state = ListState::default();
+				let mut show_file = None;
+				let commit = &app.commit_infos[index];
+				if let Some(delta) = commit.patch.get_delta(0) {
+					if let Some(path) = delta.new_file().path() {
+						// immediately show the first file
+						files_state.select_first();
+						show_file = Some(FileView {
+							contents: show(app.repo, commit.commit_id, path),
+							scroll: 0,
+						});
+					}
+				}
+
 				app.show_commit = Some(CommitView {
 					index,
-					files_state: ListState::default(),
-					show_file: None,
+					files_state,
+					show_file,
 				});
 			}
 		},
