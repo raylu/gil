@@ -144,20 +144,13 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				code: Char('k') | KeyCode::Up,
 				..
 			} => scroll_file(&mut show_commit.file_view, term_size, -1),
-			KeyEvent {
-				code: Char('n'),
-				..
-			} => scroll(&mut show_commit.files_state, 1),
-			KeyEvent {
-				code: Char('p'),
-				..
-			} => scroll(&mut show_commit.files_state, -1),
-			KeyEvent {
-				code: KeyCode::Enter, ..
-			} => {
-				if let Some(index) = show_commit.files_state.selected() {
-					app.show_commit_file(index);
-				}
+			KeyEvent { code: Char('n'), .. } => {
+				let index = scroll(&mut show_commit.files_state, 1);
+				app.show_commit_file(index);
+			},
+			KeyEvent { code: Char('p'), .. } => {
+				let index = scroll(&mut show_commit.files_state, -1);
+				app.show_commit_file(index);
 			},
 			KeyEvent {
 				code: Char('q') | KeyCode::Esc,
@@ -175,20 +168,28 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		KeyEvent {
 			code: Char('j') | KeyCode::Down,
 			..
-		} => scroll(&mut app.log_state, 1),
+		} => {
+			scroll(&mut app.log_state, 1);
+		},
 		KeyEvent {
 			code: Char('k') | KeyCode::Up,
 			..
-		} => scroll(&mut app.log_state, -1),
+		} => {
+			scroll(&mut app.log_state, -1);
+		},
 		KeyEvent { code: Char('d'), .. }
 		| KeyEvent {
 			code: KeyCode::PageDown,
 			..
-		} => scroll(&mut app.log_state, (term_size.height / 2).try_into().unwrap()),
+		} => {
+			scroll(&mut app.log_state, (term_size.height / 2).try_into().unwrap());
+		},
 		KeyEvent { code: Char('u'), .. }
 		| KeyEvent {
 			code: KeyCode::PageUp, ..
-		} => scroll(&mut app.log_state, -i16::try_from(term_size.height / 2).unwrap()),
+		} => {
+			scroll(&mut app.log_state, -i16::try_from(term_size.height / 2).unwrap());
+		},
 		KeyEvent { code: Char('g'), .. }
 		| KeyEvent {
 			code: KeyCode::Home, ..
@@ -242,14 +243,16 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	Ok(true)
 }
 
-fn scroll(list_state: &mut ListState, amount: i16) {
-	match list_state.selected() {
-		None => list_state.select(Some(0)),
+fn scroll(list_state: &mut ListState, amount: i16) -> usize {
+	let index = match list_state.selected() {
+		None => 0,
 		Some(index) => {
 			let new_index = index.saturating_add_signed(amount.into());
-			list_state.select(Some(new_index.max(0)));
+			new_index.max(0)
 		},
-	}
+	};
+	list_state.select(Some(index));
+	return index;
 }
 fn scroll_file(show_file_option: &mut Option<FileView>, term_size: &Size, amount: i16) {
 	if let Some(ref mut show_file) = show_file_option {
