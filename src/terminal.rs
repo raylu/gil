@@ -136,6 +136,14 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 
 	if let Some(ref mut show_commit) = app.show_commit {
 		match key {
+			KeyEvent { code: Char('n'), .. } => {
+				let index = scroll(&mut show_commit.files_state, 1);
+				app.show_commit_file(index);
+			},
+			KeyEvent { code: Char('p'), .. } => {
+				let index = scroll(&mut show_commit.files_state, -1);
+				app.show_commit_file(index);
+			},
 			KeyEvent {
 				code: Char('j') | KeyCode::Down,
 				..
@@ -144,13 +152,19 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				code: Char('k') | KeyCode::Up,
 				..
 			} => scroll_file(&mut show_commit.file_view, term_size, -1),
-			KeyEvent { code: Char('n'), .. } => {
-				let index = scroll(&mut show_commit.files_state, 1);
-				app.show_commit_file(index);
+			KeyEvent { code: Char('d'), .. } => {
+				scroll_file(
+					&mut show_commit.file_view,
+					term_size,
+					(term_size.height / 2).try_into().unwrap(),
+				);
 			},
-			KeyEvent { code: Char('p'), .. } => {
-				let index = scroll(&mut show_commit.files_state, -1);
-				app.show_commit_file(index);
+			KeyEvent { code: Char('u'), .. } => {
+				scroll_file(
+					&mut show_commit.file_view,
+					term_size,
+					-i16::try_from(term_size.height / 2).unwrap(),
+				);
 			},
 			KeyEvent {
 				code: Char('q') | KeyCode::Esc,
