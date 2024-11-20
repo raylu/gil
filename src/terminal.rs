@@ -137,11 +137,13 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	if let Some(ref mut show_commit) = app.show_commit {
 		match key {
 			KeyEvent { code: Char('n'), .. } => {
-				let index = scroll(&mut show_commit.files_state, 1);
+				let max = app.commit_infos[show_commit.index].num_files - 1;
+				let index = scroll(&mut show_commit.files_state, 1, Some(max));
 				app.show_commit_file(index);
 			},
 			KeyEvent { code: Char('p'), .. } => {
-				let index = scroll(&mut show_commit.files_state, -1);
+				let max = app.commit_infos[show_commit.index].num_files - 1;
+				let index = scroll(&mut show_commit.files_state, -1, Some(max));
 				app.show_commit_file(index);
 			},
 			KeyEvent {
@@ -183,26 +185,26 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			code: Char('j') | KeyCode::Down,
 			..
 		} => {
-			scroll(&mut app.log_state, 1);
+			scroll(&mut app.log_state, 1, None);
 		},
 		KeyEvent {
 			code: Char('k') | KeyCode::Up,
 			..
 		} => {
-			scroll(&mut app.log_state, -1);
+			scroll(&mut app.log_state, -1, None);
 		},
 		KeyEvent { code: Char('d'), .. }
 		| KeyEvent {
 			code: KeyCode::PageDown,
 			..
 		} => {
-			scroll(&mut app.log_state, (term_size.height / 2).try_into().unwrap());
+			scroll(&mut app.log_state, (term_size.height / 2).try_into().unwrap(), None);
 		},
 		KeyEvent { code: Char('u'), .. }
 		| KeyEvent {
 			code: KeyCode::PageUp, ..
 		} => {
-			scroll(&mut app.log_state, -i16::try_from(term_size.height / 2).unwrap());
+			scroll(&mut app.log_state, -i16::try_from(term_size.height / 2).unwrap(), None);
 		},
 		KeyEvent { code: Char('g'), .. }
 		| KeyEvent {
@@ -257,12 +259,15 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 	Ok(true)
 }
 
-fn scroll(list_state: &mut ListState, amount: i16) -> usize {
+fn scroll(list_state: &mut ListState, amount: i16, max: Option<usize>) -> usize {
 	let index = match list_state.selected() {
 		None => 0,
 		Some(index) => {
 			let new_index = index.saturating_add_signed(amount.into());
-			new_index.max(0)
+			match max {
+				None => new_index.max(0),
+				Some(max) => new_index.clamp(0, max),
+			}
 		},
 	};
 	list_state.select(Some(index));

@@ -17,6 +17,7 @@ pub struct CommitInfo<'repo> {
 	pub message: String,
 	pub patch: Diff<'repo>,
 	pub stats: Vec<String>,
+	pub num_files: usize,
 }
 
 pub fn log(repo: &Repository, commit_id: Oid) -> Result<Revwalk, git2::Error> {
@@ -49,8 +50,8 @@ pub fn next_commit<'repo>(
 		Err(_) => None,
 	};
 	let patch = repo.diff_tree_to_tree(parent_tree, Some(&commit.tree()?), None)?;
-	let stats = patch
-		.stats()?
+	let stats = patch.stats()?;
+	let stat_lines = stats
 		.to_buf(DiffStatsFormat::FULL | DiffStatsFormat::INCLUDE_SUMMARY, 100)?
 		.as_str()
 		.unwrap_or_default()
@@ -66,7 +67,8 @@ pub fn next_commit<'repo>(
 		summary: commit.summary().unwrap_or_default().to_owned(),
 		message: commit.message().unwrap_or_default().to_owned(),
 		patch,
-		stats,
+		stats: stat_lines,
+		num_files: stats.files_changed(),
 	}));
 }
 
