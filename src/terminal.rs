@@ -281,7 +281,22 @@ fn scroll_file(show_file_option: &mut Option<FileView>, term_size: &Size, amount
 }
 
 fn make_help_text() -> Text<'static> {
-	let mut help = vec!["h           this help", "q  esc      close window"];
+	let mut help = vec![
+		"h           this help",
+		"q  esc      close window",
+		"",
+		"1           short log",
+		"2           regular log",
+		"3           log with stat",
+		"",
+		"j  ↓        next commit",
+		"k  ↑        previous commit",
+		"d  pgdown   down half a window",
+		"u  pgup     up half a window",
+		"g  home     first commit",
+		"",
+		"enter       show commit",
+	];
 	(help.drain(..).map(Line::from).collect::<Vec<_>>()).into()
 }
 
