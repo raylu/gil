@@ -100,7 +100,8 @@ pub fn teardown(terminal: &mut CrosstermTerm) {
 
 pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn Error>> {
 	loop {
-		let needed: usize = usize::from(terminal.size()?.height / 2) + app.log_state.offset();
+		let commits_per_window = usize::from(terminal.size()?.height / 2);
+		let needed = commits_per_window + app.log_state.selected().unwrap_or_default();
 		while app.commit_infos.len() < needed {
 			let commit_info = match next_commit(app.repo, &mut app.revwalk) {
 				Ok(None) => break,
@@ -198,13 +199,13 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			code: KeyCode::PageDown,
 			..
 		} => {
-			scroll(&mut app.log_state, (term_size.height / 2).try_into().unwrap(), None);
+			scroll(&mut app.log_state, (term_size.height / 4).try_into().unwrap(), None);
 		},
 		KeyEvent { code: Char('u'), .. }
 		| KeyEvent {
 			code: KeyCode::PageUp, ..
 		} => {
-			scroll(&mut app.log_state, -i16::try_from(term_size.height / 2).unwrap(), None);
+			scroll(&mut app.log_state, -i16::try_from(term_size.height / 4).unwrap(), None);
 		},
 		KeyEvent { code: Char('g'), .. }
 		| KeyEvent {
