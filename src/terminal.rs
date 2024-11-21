@@ -29,7 +29,7 @@ pub struct App<'repo> {
 	revwalk: Revwalk<'repo>,
 	log_mode: LogMode,
 	log_state: ListState,
-	show_commit: Option<CommitView>,
+	commit_view: Option<CommitView>,
 	popup: Option<Text<'static>>,
 }
 
@@ -52,13 +52,13 @@ impl App<'_> {
 			revwalk,
 			log_mode: LogMode::Short,
 			log_state: ListState::default(),
-			show_commit: None,
+			commit_view: None,
 			popup: None,
 		}
 	}
 
 	fn show_commit_file(&mut self, index: usize) {
-		let show_commit = self.show_commit.as_mut().unwrap();
+		let show_commit = self.commit_view.as_mut().unwrap();
 		show_commit.show_file(self.repo, &self.commit_infos, index);
 	}
 }
@@ -135,7 +135,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		return Ok(true);
 	}
 
-	if let Some(ref mut show_commit) = app.show_commit {
+	if let Some(ref mut show_commit) = app.commit_view {
 		match key {
 			KeyEvent { code: Char('n'), .. } => {
 				let max = app.commit_infos[show_commit.index].num_files - 1;
@@ -181,7 +181,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				code: Char('q') | KeyCode::Esc,
 				..
 			} => {
-				app.show_commit = None;
+				app.commit_view = None;
 			},
 			_ => {}, // ignored
 		}
@@ -249,7 +249,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 					}
 				}
 
-				app.show_commit = Some(CommitView {
+				app.commit_view = Some(CommitView {
 					index,
 					files_state,
 					file_view: show_file,
@@ -333,7 +333,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	);
 
 	let highlight_style = Style::default().bg(Color::Indexed(237)); // 232 is black, 255 is white; 237 is dark gray
-	match app.show_commit {
+	match app.commit_view {
 		None => {
 			// log view
 			let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
