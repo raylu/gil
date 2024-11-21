@@ -57,6 +57,28 @@ impl App<'_> {
 		}
 	}
 
+	fn show_commit(&mut self, index: usize) {
+		let mut files_state = ListState::default();
+		let mut show_file = None;
+		let commit = &self.commit_infos[index];
+		if let Some(delta) = commit.patch.get_delta(0) {
+			if let Some(path) = delta.new_file().path() {
+				// immediately show the first file
+				files_state.select_first();
+				show_file = Some(FileView {
+					contents: show(self.repo, commit.commit_id, path),
+					scroll: 0,
+				});
+			}
+		}
+
+		self.commit_view = Some(CommitView {
+			index,
+			files_state,
+			file_view: show_file,
+		});
+	}
+
 	fn show_commit_file(&mut self, index: usize) {
 		let show_commit = self.commit_view.as_mut().unwrap();
 		show_commit.show_file(self.repo, &self.commit_infos, index);
@@ -235,25 +257,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			code: KeyCode::Enter, ..
 		} => {
 			if let Some(index) = app.log_state.selected() {
-				let mut files_state = ListState::default();
-				let mut show_file = None;
-				let commit = &app.commit_infos[index];
-				if let Some(delta) = commit.patch.get_delta(0) {
-					if let Some(path) = delta.new_file().path() {
-						// immediately show the first file
-						files_state.select_first();
-						show_file = Some(FileView {
-							contents: show(app.repo, commit.commit_id, path),
-							scroll: 0,
-						});
-					}
-				}
-
-				app.commit_view = Some(CommitView {
-					index,
-					files_state,
-					file_view: show_file,
-				});
+				app.show_commit(index);
 			}
 		},
 		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_log_help_text()),
