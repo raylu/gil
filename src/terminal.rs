@@ -155,20 +155,28 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				code: Char('k') | KeyCode::Up,
 				..
 			} => scroll_file(&mut show_commit.file_view, term_size, -1),
-			KeyEvent { code: Char('d'), .. } => {
+			KeyEvent { code: Char('d'), .. }
+			| KeyEvent {
+				code: KeyCode::PageDown,
+				..
+			} => {
 				scroll_file(
 					&mut show_commit.file_view,
 					term_size,
 					(term_size.height / 2).try_into().unwrap(),
 				);
 			},
-			KeyEvent { code: Char('u'), .. } => {
+			KeyEvent { code: Char('u'), .. }
+			| KeyEvent {
+				code: KeyCode::PageUp, ..
+			} => {
 				scroll_file(
 					&mut show_commit.file_view,
 					term_size,
 					-i16::try_from(term_size.height / 2).unwrap(),
 				);
 			},
+			KeyEvent { code: Char('h'), .. } => app.popup = Some(make_commit_help_text()),
 			KeyEvent {
 				code: Char('q') | KeyCode::Esc,
 				..
@@ -248,7 +256,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				});
 			}
 		},
-		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_help_text()),
+		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_log_help_text()),
 		KeyEvent {
 			code: Char('q') | KeyCode::Esc,
 			..
@@ -281,7 +289,7 @@ fn scroll_file(show_file_option: &mut Option<FileView>, term_size: &Size, amount
 	}
 }
 
-fn make_help_text() -> Text<'static> {
+fn make_log_help_text() -> Text<'static> {
 	let mut help = vec![
 		"h           this help",
 		"q  esc      close window",
@@ -297,6 +305,21 @@ fn make_help_text() -> Text<'static> {
 		"g  home     first commit",
 		"",
 		"enter       show commit",
+	];
+	(help.drain(..).map(Line::from).collect::<Vec<_>>()).into()
+}
+fn make_commit_help_text() -> Text<'static> {
+	let mut help = vec![
+		"h           this help",
+		"q  esc      close window",
+		"",
+		"n           next file",
+		"p           previous file",
+		"",
+		"j  ↓        down one line",
+		"k  ↑        up one line",
+		"d  pgdown   down half a window",
+		"u  pgup     up half a window",
 	];
 	(help.drain(..).map(Line::from).collect::<Vec<_>>()).into()
 }
@@ -316,20 +339,6 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
 				.highlight_style(highlight_style);
 			frame.render_stateful_widget(commit_list, area, &mut app.log_state);
-
-			if let Some(popup) = &app.popup {
-				let paragraph = Paragraph::new(popup.clone()).wrap(Wrap { trim: false });
-				let area = centered_rect(80, 80, frame.area());
-				frame.render_widget(Clear, area);
-				frame.render_widget(Block::default().borders(Borders::all()), area);
-				frame.render_widget(
-					paragraph,
-					area.inner(tui::layout::Margin {
-						vertical: 2,
-						horizontal: 3,
-					}),
-				);
-			}
 		},
 		Some(ref mut show_commit) => {
 			// show view
@@ -372,6 +381,20 @@ fn ui(frame: &mut Frame, app: &mut App) {
 				);
 			}
 		},
+	}
+
+	if let Some(popup) = &app.popup {
+		let paragraph = Paragraph::new(popup.clone()).wrap(Wrap { trim: false });
+		let area = centered_rect(80, 80, frame.area());
+		frame.render_widget(Clear, area);
+		frame.render_widget(Block::default().borders(Borders::all()), area);
+		frame.render_widget(
+			paragraph,
+			area.inner(tui::layout::Margin {
+				vertical: 2,
+				horizontal: 3,
+			}),
+		);
 	}
 }
 
