@@ -5,9 +5,9 @@ mod git;
 mod terminal;
 
 fn main() {
-	let args: Vec<String> = env::args().collect();
-	if args.len() > 2 {
-		println!("usage: {} [rev]", args[0].rsplit('/').next().unwrap());
+	let argv: Vec<String> = env::args().collect();
+	if argv.len() > 3 {
+		println!("usage: {} [rev] [--show]", argv[0].rsplit('/').next().unwrap());
 		return;
 	}
 
@@ -18,7 +18,7 @@ fn main() {
 			return;
 		},
 	};
-	let commit_id = match get_commit_id(&repo, &args) {
+	let args = match get_commit_id(&repo, &argv[1..]) {
 		Ok(commit_id) => commit_id,
 		Err(err) => {
 			println!("couldn't get commit: {}", err.message());
@@ -26,15 +26,15 @@ fn main() {
 		},
 	};
 
-	let revwalk = match git::log(&repo, commit_id) {
+	let revwalk = match git::log(&repo, args.commit_id) {
 		Ok(revwalk) => revwalk,
 		Err(err) => {
-			println!("couldn't log {}: {}", commit_id, err.message());
+			println!("couldn't log {}: {}", args.commit_id, err.message());
 			return;
 		},
 	};
 
-	let app = terminal::App::new(&repo, revwalk);
+	let app = terminal::App::new(&repo, revwalk, args.show);
 	let mut term = terminal::setup().unwrap();
 	let res = terminal::run_app(&mut term, app);
 
@@ -44,14 +44,36 @@ fn main() {
 	}
 }
 
-fn get_commit_id(repo: &Repository, args: &[String]) -> Result<Oid, git2::Error> {
-	if args.len() == 2 {
-		Ok(repo.revparse_single(&args[1])?.id())
-	} else {
-		repo.head()?.target().ok_or(git2::Error::new(
+struct Args {
+	commit_id: Oid,
+	show: bool,
+}
+
+fn get_commit_id(repo: &Repository, args: &[String]) -> Result<Args, git2::Error> {
+	let mut show = false;
+	let mut commit_id: Option<Oid> = None;
+	for arg in args {
+		if arg == "--show" {
+			show = true;
+		} else if commit_id.is_none() {
+			commit_id = Some(repo.revparse_single(arg)?.id())
+		} else {
+			return Err(git2::Error::new(
+				git2::ErrorCode::GenericError,
+				git2::ErrorClass::None,
+				format!("cannot pass multiple commits ({})", arg),
+			));
+		}
+	}
+	if commit_id.is_none() {
+		commit_id = Some(repo.head()?.target().ok_or(git2::Error::new(
 			git2::ErrorCode::GenericError,
 			git2::ErrorClass::None,
 			"couldn't resolve HEAD",
-		))
+		))?);
 	}
+	Ok(Args {
+		commit_id: commit_id.unwrap(),
+		show,
+	})
 }

@@ -27,6 +27,7 @@ pub struct App<'repo> {
 	repo: &'repo Repository,
 	commit_infos: Vec<CommitInfo<'repo>>,
 	revwalk: Revwalk<'repo>,
+	show_only: bool,
 	log_mode: LogMode,
 	log_state: ListState,
 	commit_view: Option<CommitView>,
@@ -45,11 +46,12 @@ struct FileView {
 }
 
 impl App<'_> {
-	pub fn new<'a>(repo: &'a Repository, revwalk: Revwalk<'a>) -> App<'a> {
+	pub fn new<'a>(repo: &'a Repository, revwalk: Revwalk<'a>, show_only: bool) -> App<'a> {
 		App {
 			repo,
 			commit_infos: vec![],
 			revwalk,
+			show_only,
 			log_mode: LogMode::Short,
 			log_state: ListState::default(),
 			commit_view: None,
@@ -122,8 +124,12 @@ pub fn teardown(terminal: &mut CrosstermTerm) {
 
 pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn Error>> {
 	loop {
-		let commits_per_window = usize::from(terminal.size()?.height / 2);
-		let needed = commits_per_window + app.log_state.selected().unwrap_or_default();
+		let needed = if app.show_only {
+			1
+		} else {
+			let commits_per_window = usize::from(terminal.size()?.height / 2);
+			commits_per_window + app.log_state.selected().unwrap_or_default()
+		};
 		while app.commit_infos.len() < needed {
 			let commit_info = match next_commit(app.repo, &mut app.revwalk) {
 				Ok(None) => break,
@@ -134,6 +140,10 @@ pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn
 				},
 			};
 			app.commit_infos.push(commit_info);
+		}
+
+		if app.show_only && app.commit_view.is_none() {
+			app.show_commit(0);
 		}
 
 		terminal.draw(|frame| ui(frame, &mut app))?;
@@ -203,6 +213,9 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				code: Char('q') | KeyCode::Esc,
 				..
 			} => {
+				if app.show_only {
+					return Ok(false);
+				}
 				app.commit_view = None;
 			},
 			_ => {}, // ignored
