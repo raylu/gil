@@ -72,7 +72,7 @@ pub fn next_commit<'repo>(
 	}));
 }
 
-fn format_stat_line<'repo>(line: &str) -> Line<'repo> {
+fn format_stat_line(line: &str) -> Line<'static> {
 	if let Some((path, changes)) = line.split_once(" | ") {
 		if let Some((num_changes, sigils)) = changes.rsplit_once(' ') {
 			let (insertions, deletions) = sigils.split_once('-').unwrap_or((sigils, ""));
