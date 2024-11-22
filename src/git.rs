@@ -7,7 +7,10 @@ use std::{
 
 use ansi_to_tui::IntoText;
 use git2::{BranchType, Diff, DiffStatsFormat, Oid, Repository, Revwalk};
-use tui::text::Text;
+use tui::{
+	style::Stylize,
+	text::{Line, Span, Text},
+};
 
 pub struct CommitInfo<'repo> {
 	pub commit_id: Oid,
@@ -17,7 +20,7 @@ pub struct CommitInfo<'repo> {
 	pub summary: String,
 	pub message: String,
 	pub patch: Diff<'repo>,
-	pub stats: Vec<String>,
+	pub stats: Vec<Line<'repo>>,
 	pub num_files: usize,
 }
 
@@ -53,13 +56,8 @@ pub fn next_commit<'repo>(
 	let mut patch = repo.diff_tree_to_tree(parent_tree, Some(&commit.tree()?), None)?;
 	patch.find_similar(None)?;
 	let stats = patch.stats()?;
-	let stat_lines = stats
-		.to_buf(DiffStatsFormat::FULL | DiffStatsFormat::INCLUDE_SUMMARY, 100)?
-		.as_str()
-		.unwrap_or_default()
-		.lines()
-		.map(|line| line.to_owned())
-		.collect();
+	let stat_buf = stats.to_buf(DiffStatsFormat::FULL | DiffStatsFormat::INCLUDE_SUMMARY, 100)?;
+	let stat_lines: Vec<Line<'repo>> = stat_buf.as_str().unwrap_or_default().lines().map(format_stat_line).collect();
 
 	return Ok(Some(CommitInfo {
 		commit_id,
@@ -72,6 +70,20 @@ pub fn next_commit<'repo>(
 		stats: stat_lines,
 		num_files: stats.files_changed(),
 	}));
+}
+
+fn format_stat_line<'repo>(line: &str) -> Line<'repo> {
+	if let Some((path, changes)) = line.split_once(" | ") {
+		if let Some((num_changes, sigils)) = changes.rsplit_once(' ') {
+			let (insertions, deletions) = sigils.split_once('-').unwrap_or((sigils, ""));
+			return Line::from(vec![
+				Span::from(format!("{} | {} ", path, num_changes)),
+				Span::from(insertions.to_owned()).green(),
+				Span::from(deletions.to_owned()).red(),
+			]);
+		}
+	}
+	Line::from(line.to_owned())
 }
 
 pub struct Decorations {

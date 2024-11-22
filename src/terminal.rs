@@ -455,7 +455,7 @@ fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode, decorations: 
 		},
 	}
 	if *log_mode == LogMode::Long {
-		lines.extend(ci.stats.iter().map(|sl: &String| Line::from(sl.clone())));
+		lines.extend(ci.stats.iter().map(|sl: &Line| sl.to_owned()));
 		lines.push(Line::from(""));
 	}
 	return lines.into();
