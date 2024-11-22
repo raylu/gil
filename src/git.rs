@@ -1,4 +1,5 @@
 use std::{
+	collections::HashMap,
 	ffi::OsString,
 	path::Path,
 	process::{Command, Stdio},
@@ -70,6 +71,43 @@ pub fn next_commit<'repo>(
 		stats: stat_lines,
 		num_files: stats.files_changed(),
 	}));
+}
+
+pub struct Decorations {
+	pub branches: HashMap<Oid, Vec<String>>,
+	pub tags: HashMap<Oid, Vec<String>>,
+}
+
+pub fn decorations(repo: &Repository) -> Result<Decorations, git2::Error> {
+	let mut branches: HashMap<Oid, Vec<String>> = HashMap::new();
+
+	for branch_result in repo.branches(None)? {
+		let (branch, _) = branch_result?;
+		if let Some(name) = branch.name()? {
+			if let Some(target) = branch.get().target() {
+				push(&mut branches, target, name.to_owned());
+			}
+		}
+	}
+
+	let mut tags: HashMap<Oid, Vec<String>> = HashMap::new();
+	repo.tag_foreach(|tag_id, name_bytes| {
+		let name = String::from_utf8_lossy(name_bytes);
+		let name = name.strip_prefix("refs/tags/").unwrap_or(&name);
+		push(&mut tags, tag_id, name.to_string());
+		true
+	})?;
+
+	Ok(Decorations { branches, tags })
+}
+
+fn push(map: &mut HashMap<Oid, Vec<String>>, commit_id: Oid, name: String) {
+	match map.get_mut(&commit_id) {
+		Some(vec) => vec.push(name),
+		None => {
+			map.insert(commit_id, vec![name]);
+		},
+	};
 }
 
 pub fn show(repo: &Repository, commit_id: Oid, file_path: &Path) -> Text<'static> {

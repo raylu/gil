@@ -21,12 +21,13 @@ use tui::{
 	Frame, Terminal,
 };
 
-use crate::git::{next_commit, show, CommitInfo};
+use crate::git::{next_commit, show, CommitInfo, Decorations};
 
 pub struct App<'repo> {
 	repo: &'repo Repository,
 	commit_infos: Vec<CommitInfo<'repo>>,
 	revwalk: Revwalk<'repo>,
+	decorations: Decorations,
 	show_only: bool,
 	log_mode: LogMode,
 	log_state: ListState,
@@ -46,11 +47,12 @@ struct FileView {
 }
 
 impl App<'_> {
-	pub fn new<'a>(repo: &'a Repository, revwalk: Revwalk<'a>, show_only: bool) -> App<'a> {
+	pub fn new<'a>(repo: &'a Repository, revwalk: Revwalk<'a>, decorations: Decorations, show_only: bool) -> App<'a> {
 		App {
 			repo,
 			commit_infos: vec![],
 			revwalk,
+			decorations,
 			show_only,
 			log_mode: LogMode::Short,
 			log_state: ListState::default(),
@@ -353,8 +355,9 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	match app.commit_view {
 		None => {
 			// log view
-			let commit_list = List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode)))
-				.highlight_style(highlight_style);
+			let commit_list =
+				List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode, &app.decorations)))
+					.highlight_style(highlight_style);
 			frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 		},
 		Some(ref mut show_commit) => {
@@ -415,17 +418,31 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	}
 }
 
-fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode) -> ListItem<'a> {
+fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode, decorations: &'a Decorations) -> ListItem<'a> {
 	let mut commit_id = ci.commit_id.to_string();
 	commit_id.truncate(8);
-	let mut lines = vec![Line::from(vec![
+	let mut first_line = vec![
 		Span::from(commit_id).yellow(),
 		" ".to_span(),
 		ci.time.to_span().green(),
 		" ".to_span(),
 		ci.author_name.to_span().light_blue().bold(),
 		Span::from(format!(" <{}>", ci.author_email)).blue(),
-	])];
+	];
+	if let Some(branches) = decorations.branches.get(&ci.commit_id) {
+		for branch in branches {
+			first_line.push(" ".to_span());
+			first_line.push(branch.to_span().green());
+		}
+	}
+	if let Some(tags) = decorations.tags.get(&ci.commit_id) {
+		for tag in tags {
+			first_line.push(" ".to_span());
+			first_line.push(tag.to_span().yellow());
+		}
+	}
+
+	let mut lines = vec![Line::from(first_line)];
 	match log_mode {
 		LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
 		LogMode::Medium | LogMode::Long => {

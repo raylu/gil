@@ -33,8 +33,15 @@ fn main() {
 			return;
 		},
 	};
+	let decorations = match git::decorations(&repo) {
+		Ok(decorations) => decorations,
+		Err(err) => {
+			println!("couldn't get decorations: {}", err.message());
+			return;
+		},
+	};
 
-	let app = terminal::App::new(&repo, revwalk, args.show);
+	let app = terminal::App::new(&repo, revwalk, decorations, args.show);
 	let mut term = terminal::setup().unwrap();
 	let res = terminal::run_app(&mut term, app);
 
