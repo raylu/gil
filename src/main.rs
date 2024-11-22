@@ -18,7 +18,7 @@ fn main() {
 			return;
 		},
 	};
-	let args = match get_commit_id(&repo, &argv[1..]) {
+	let args = match parse_args(&repo, &argv[1..]) {
 		Ok(commit_id) => commit_id,
 		Err(err) => {
 			println!("couldn't get commit: {}", err.message());
@@ -56,7 +56,7 @@ struct Args {
 	show: bool,
 }
 
-fn get_commit_id(repo: &Repository, args: &[String]) -> Result<Args, git2::Error> {
+fn parse_args(repo: &Repository, args: &[String]) -> Result<Args, git2::Error> {
 	let mut show = false;
 	let mut commit_id: Option<Oid> = None;
 	for arg in args {
