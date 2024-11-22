@@ -7,7 +7,7 @@ use crossterm::{
 	execute,
 	terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use git2::{Repository, Revwalk};
+use git2::{BranchType, Repository, Revwalk};
 use std::{
 	error::Error,
 	io::{self, Stdout},
@@ -430,15 +430,19 @@ fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode, decorations: 
 		Span::from(format!(" <{}>", ci.author_email)).blue(),
 	];
 	if let Some(branches) = decorations.branches.get(&ci.commit_id) {
-		for branch in branches {
+		for (branch_name, branch_type) in branches {
 			first_line.push(" ".to_span());
-			first_line.push(branch.to_span().green());
+			let color = match branch_type {
+				BranchType::Local => Color::LightGreen,
+				BranchType::Remote => Color::LightRed,
+			};
+			first_line.push(Span::from(branch_name).style(Style::default().fg(color)));
 		}
 	}
 	if let Some(tags) = decorations.tags.get(&ci.commit_id) {
 		for tag in tags {
 			first_line.push(" ".to_span());
-			first_line.push(tag.to_span().yellow());
+			first_line.push(tag.to_span().light_yellow());
 		}
 	}
 

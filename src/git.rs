@@ -6,7 +6,7 @@ use std::{
 };
 
 use ansi_to_tui::IntoText;
-use git2::{Diff, DiffStatsFormat, Oid, Repository, Revwalk};
+use git2::{BranchType, Diff, DiffStatsFormat, Oid, Repository, Revwalk};
 use tui::text::Text;
 
 pub struct CommitInfo<'repo> {
@@ -74,18 +74,18 @@ pub fn next_commit<'repo>(
 }
 
 pub struct Decorations {
-	pub branches: HashMap<Oid, Vec<String>>,
+	pub branches: HashMap<Oid, Vec<(String, BranchType)>>,
 	pub tags: HashMap<Oid, Vec<String>>,
 }
 
 pub fn decorations(repo: &Repository) -> Result<Decorations, git2::Error> {
-	let mut branches: HashMap<Oid, Vec<String>> = HashMap::new();
+	let mut branches: HashMap<Oid, Vec<(String, BranchType)>> = HashMap::new();
 
 	for branch_result in repo.branches(None)? {
-		let (branch, _) = branch_result?;
+		let (branch, branch_type) = branch_result?;
 		if let Some(name) = branch.name()? {
 			if let Some(target) = branch.get().target() {
-				push(&mut branches, target, name.to_owned());
+				push(&mut branches, target, (name.to_owned(), branch_type));
 			}
 		}
 	}
@@ -101,7 +101,7 @@ pub fn decorations(repo: &Repository) -> Result<Decorations, git2::Error> {
 	Ok(Decorations { branches, tags })
 }
 
-fn push(map: &mut HashMap<Oid, Vec<String>>, commit_id: Oid, name: String) {
+fn push<T>(map: &mut HashMap<Oid, Vec<T>>, commit_id: Oid, name: T) {
 	match map.get_mut(&commit_id) {
 		Some(vec) => vec.push(name),
 		None => {
