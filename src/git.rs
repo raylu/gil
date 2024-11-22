@@ -50,7 +50,8 @@ pub fn next_commit<'repo>(
 		},
 		Err(_) => None,
 	};
-	let patch = repo.diff_tree_to_tree(parent_tree, Some(&commit.tree()?), None)?;
+	let mut patch = repo.diff_tree_to_tree(parent_tree, Some(&commit.tree()?), None)?;
+	patch.find_similar(None)?;
 	let stats = patch.stats()?;
 	let stat_lines = stats
 		.to_buf(DiffStatsFormat::FULL | DiffStatsFormat::INCLUDE_SUMMARY, 100)?
