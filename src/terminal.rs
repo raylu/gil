@@ -355,9 +355,13 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	match app.commit_view {
 		None => {
 			// log view
-			let commit_list =
-				List::new(app.commit_infos.iter().map(|ci| commit_info_to_item(ci, &app.log_mode, &app.decorations)))
-					.highlight_style(highlight_style);
+			let commit_list = List::new(
+				app.commit_infos
+					.iter()
+					.map(|ci| commit_info_to_item(ci, &app.log_mode, &app.decorations, area.width)),
+			)
+			.highlight_style(highlight_style)
+			.scroll_padding(2);
 			frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 		},
 		Some(ref mut show_commit) => {
@@ -418,7 +422,12 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	}
 }
 
-fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode, decorations: &'a Decorations) -> ListItem<'a> {
+fn commit_info_to_item<'a>(
+	ci: &'a CommitInfo,
+	log_mode: &LogMode,
+	decorations: &'a Decorations,
+	width: u16,
+) -> ListItem<'a> {
 	let mut commit_id = ci.commit_id.to_string();
 	commit_id.truncate(8);
 	let mut first_line = vec![
@@ -448,9 +457,9 @@ fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode, decorations: 
 
 	let mut lines = vec![Line::from(first_line)];
 	match log_mode {
-		LogMode::Short => lines.push(Line::from(format!("    {}", ci.summary))),
+		LogMode::Short => push_wrapped_lines(&mut lines, &ci.summary, width),
 		LogMode::Medium | LogMode::Long => {
-			ci.message.lines().for_each(|l| lines.push(Line::from(format!("    {}", l))));
+			ci.message.lines().for_each(|l| push_wrapped_lines(&mut lines, l, width));
 			lines.push(Line::from(""));
 		},
 	}
@@ -459,6 +468,11 @@ fn commit_info_to_item<'a>(ci: &'a CommitInfo, log_mode: &LogMode, decorations: 
 		lines.push(Line::from(""));
 	}
 	return lines.into();
+}
+
+fn push_wrapped_lines(lines: &mut Vec<Line>, line: &str, width: u16) {
+	let wrapped = textwrap::wrap(line, textwrap::Options::new(width.into()).initial_indent("    "));
+	lines.extend(wrapped.iter().map(|cow| Line::from(cow.to_string())));
 }
 
 // from https://github.com/tui-rs-revival/ratatui/blob/main/examples/popup.rs
