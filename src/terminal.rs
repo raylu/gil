@@ -37,6 +37,7 @@ pub struct App<'repo> {
 
 struct CommitView {
 	index: usize,
+	message_scroll: u16,
 	files_state: ListState,
 	file_view: Option<FileView>,
 }
@@ -78,6 +79,7 @@ impl App<'_> {
 
 		self.commit_view = Some(CommitView {
 			index,
+			message_scroll: 0,
 			files_state,
 			file_view: show_file,
 		});
@@ -182,13 +184,13 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				app.show_commit_file(index);
 			},
 			KeyEvent {
-				code: Char('j') | KeyCode::Down,
-				..
-			} => scroll_file(&mut show_commit.file_view, term_size, 1),
-			KeyEvent {
-				code: Char('k') | KeyCode::Up,
-				..
-			} => scroll_file(&mut show_commit.file_view, term_size, -1),
+				code: KeyCode::Down, ..
+			} => show_commit.message_scroll = show_commit.message_scroll.saturating_add(1),
+			KeyEvent { code: KeyCode::Up, .. } => {
+				show_commit.message_scroll = show_commit.message_scroll.saturating_sub(1)
+			},
+			KeyEvent { code: Char('j'), .. } => scroll_file(&mut show_commit.file_view, term_size, 1),
+			KeyEvent { code: Char('k'), .. } => scroll_file(&mut show_commit.file_view, term_size, -1),
 			KeyEvent { code: Char('d'), .. }
 			| KeyEvent {
 				code: KeyCode::PageDown,
@@ -335,10 +337,13 @@ fn make_commit_help_text() -> Text<'static> {
 		"n           next file",
 		"p           previous file",
 		"",
-		"j  ↓        down one line",
-		"k  ↑        up one line",
+		"j           down one line",
+		"k           up one line",
 		"d  pgdown   down half a window",
 		"u  pgup     up half a window",
+		"",
+		"↓           scroll commit message down",
+		"↑           scroll commit message up",
 	];
 	(help.drain(..).map(Line::from).collect::<Vec<_>>()).into()
 }
@@ -384,6 +389,10 @@ fn ui(frame: &mut Frame, app: &mut App) {
 			let commit_message = Paragraph::new(commit.message.as_str())
 				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()))
 				.wrap(Wrap { trim: false });
+			let line_count: u16 = commit_message.line_count(message_and_files[0].width).try_into().unwrap_or(u16::MAX);
+			show_commit.message_scroll =
+				show_commit.message_scroll.min(line_count.saturating_sub(message_and_files[0].height));
+			let commit_message = commit_message.scroll((show_commit.message_scroll, 0));
 			frame.render_widget(commit_message, message_and_files[0]);
 
 			let mut commit_file_items = vec![];
