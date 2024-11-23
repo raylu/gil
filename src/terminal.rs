@@ -381,8 +381,9 @@ fn ui(frame: &mut Frame, app: &mut App) {
 				.split(commit_and_patch[0]);
 			let commit = &app.commit_infos[show_commit.index];
 
-			let commit_message = Paragraph::new(commit.message.clone())
-				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()));
+			let commit_message = Paragraph::new(commit.message.as_str())
+				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()))
+				.wrap(Wrap { trim: false });
 			frame.render_widget(commit_message, message_and_files[0]);
 
 			let mut commit_file_items = vec![];
