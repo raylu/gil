@@ -439,15 +439,17 @@ fn commit_info_to_item<'a>(
 	width: u16,
 ) -> ListItem<'a> {
 	let mut commit_id = ci.commit_id.to_string();
-	commit_id.truncate(8);
-	let mut first_line = vec![
-		Span::from(commit_id).yellow(),
-		" ".to_span(),
-		ci.time.to_span().green(),
-		" ".to_span(),
-		ci.author_name.to_span().light_blue().bold(),
-		Span::from(format!(" <{}>", ci.author_email)).blue(),
-	];
+	if log_mode != &LogMode::Long {
+		commit_id.truncate(8);
+	}
+	let mut first_line = vec![Span::from(commit_id).yellow(), " ".to_span(), ci.time.to_span().green()];
+	if log_mode == &LogMode::Short || log_mode == &LogMode::Medium {
+		first_line.extend([
+			" ".to_span(),
+			ci.author_name.to_span().light_blue().bold(),
+			format!(" <{}>", ci.author_email).blue(),
+		]);
+	}
 	if let Some(branches) = decorations.branches.get(&ci.commit_id) {
 		for (branch_name, branch_type) in branches {
 			first_line.push(" ".to_span());
@@ -466,6 +468,13 @@ fn commit_info_to_item<'a>(
 	}
 
 	let mut lines = vec![Line::from(first_line)];
+	if log_mode == &LogMode::Long {
+		lines.push(Line::from(vec![
+			ci.author_name.to_span().light_blue().bold(),
+			format!(" <{}>", ci.author_email).blue(),
+		]));
+		lines.push(Line::raw(""));
+	}
 	match log_mode {
 		LogMode::Short => push_wrapped_lines(&mut lines, &ci.summary, width),
 		LogMode::Medium | LogMode::Long => {
