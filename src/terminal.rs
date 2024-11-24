@@ -476,9 +476,9 @@ fn commit_info_to_item<'a>(
 		lines.push(Line::raw(""));
 	}
 	match log_mode {
-		LogMode::Short => push_wrapped_lines(&mut lines, &ci.summary, width),
+		LogMode::Short => lines.extend(wrap_line(&ci.summary, width)),
 		LogMode::Medium | LogMode::Long => {
-			ci.message.lines().for_each(|l| push_wrapped_lines(&mut lines, l, width));
+			ci.message.lines().for_each(|l| lines.extend(wrap_line(l, width)));
 			lines.push(Line::from(""));
 		},
 	}
@@ -489,9 +489,9 @@ fn commit_info_to_item<'a>(
 	return lines.into();
 }
 
-fn push_wrapped_lines(lines: &mut Vec<Line>, line: &str, width: u16) {
+fn wrap_line(line: &str, width: u16) -> impl Iterator<Item = Line> {
 	let wrapped = textwrap::wrap(line, textwrap::Options::new(width.into()).initial_indent("    "));
-	lines.extend(wrapped.iter().map(|cow| Line::from(cow.to_string())));
+	wrapped.into_iter().map(|cow| Line::from(cow.to_string()))
 }
 
 // from https://github.com/tui-rs-revival/ratatui/blob/main/examples/popup.rs
