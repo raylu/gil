@@ -394,10 +394,16 @@ fn ui(frame: &mut Frame, app: &mut App) {
 
 			let mut commit_file_items = vec![];
 			for delta in commit.patch.deltas() {
-				commit_file_items.push(match delta.new_file().path() {
+				let mut filename = match delta.new_file().path() {
 					Some(file_path) => file_path.to_string_lossy(),
 					None => "".into(),
-				});
+				};
+				if delta.status() == git2::Delta::Renamed || delta.status() == git2::Delta::Copied {
+					if let Some(old_path) = delta.old_file().path() {
+						filename = format!("{} → {}", old_path.to_string_lossy(), filename).into();
+					}
+				}
+				commit_file_items.push(filename);
 			}
 			let commit_files = List::new(commit_file_items).highlight_style(highlight_style);
 			frame.render_stateful_widget(commit_files, message_and_files[1], &mut show_commit.files_state);
