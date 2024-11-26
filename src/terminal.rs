@@ -63,26 +63,19 @@ impl App<'_> {
 	}
 
 	fn show_commit(&mut self, index: usize) {
-		let mut files_state = ListState::default();
-		let mut show_file = None;
-		let commit = &self.commit_infos[index];
-		if let Some(delta) = commit.patch.get_delta(0) {
-			if let Some(path) = delta.new_file().path() {
-				// immediately show the first file
-				files_state.select_first();
-				show_file = Some(FileView {
-					contents: show(self.repo, commit.commit_id, path),
-					scroll: 0,
-				});
-			}
-		}
-
 		self.commit_view = Some(CommitView {
 			index,
 			message_scroll: 0,
-			files_state,
-			file_view: show_file,
+			files_state: ListState::default(),
+			file_view: None,
 		});
+
+		let commit = &self.commit_infos[index];
+		if commit.patch.deltas().len() > 0 {
+			// immediately show the first file
+			self.commit_view.as_mut().unwrap().files_state.select_first();
+			self.show_commit_file(0);
+		}
 	}
 
 	fn show_commit_file(&mut self, index: usize) {
@@ -93,12 +86,16 @@ impl App<'_> {
 
 impl CommitView {
 	fn show_file(&mut self, repo: &Repository, commit_infos: &[CommitInfo], index: usize) {
+		self.file_view = None;
 		let commit = &commit_infos[self.index];
-		if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
-			self.file_view = Some(FileView {
-				contents: show(repo, commit.commit_id, path),
-				scroll: 0,
-			});
+		let delta = commit.patch.get_delta(index).unwrap();
+		if delta.status() != git2::Delta::Deleted {
+			if let Some(path) = commit.patch.get_delta(index).unwrap().new_file().path() {
+				self.file_view = Some(FileView {
+					contents: show(repo, commit.commit_id, path),
+					scroll: 0,
+				});
+			}
 		}
 	}
 }
