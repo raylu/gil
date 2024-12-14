@@ -363,7 +363,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 					.map(|ci| commit_info_to_item(ci, &app.log_mode, &app.decorations, area.width)),
 			)
 			.highlight_style(highlight_style)
-			.scroll_padding(2);
+			.scroll_padding(5);
 			frame.render_stateful_widget(commit_list, area, &mut app.log_state);
 		},
 		Some(ref mut show_commit) => {
