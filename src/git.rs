@@ -132,6 +132,7 @@ pub fn show(repo: &Repository, commit_id: Oid, file_path: &Path) -> Text<'static
 			OsString::from("--color=always").as_os_str(),
 			OsString::from("--expand-tabs=4").as_os_str(),
 			OsString::from(commit_id.to_string()).as_os_str(),
+			OsString::from("--").as_os_str(), // needed for files that don't exist in the worktree
 			file_path.as_os_str(),
 		])
 		.current_dir(repo_path)
