@@ -7,10 +7,12 @@ use crossterm::{
 	execute,
 	terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use git2::{BranchType, Repository, Revwalk};
+use git2::{BranchType, Oid, Repository, Revwalk};
 use std::{
 	error::Error,
 	io::{self, Stdout},
+	os::unix::process::CommandExt,
+	process::Command,
 };
 use tui::{
 	backend::CrosstermBackend,
@@ -29,6 +31,7 @@ pub struct App<'repo> {
 	term: CrosstermTerm,
 	repo: &'repo Repository,
 	revwalk: Revwalk<'repo>,
+	commit_id: Oid,
 	show_only: bool,
 	state: AppRenderState<'repo>,
 }
@@ -60,12 +63,14 @@ impl App<'_> {
 		repo: &'a Repository,
 		revwalk: Revwalk<'a>,
 		decorations: Decorations,
+		commit_id: Oid,
 		show_only: bool,
 	) -> App<'a> {
 		App {
 			term,
 			repo,
 			revwalk,
+			commit_id,
 			show_only,
 			state: AppRenderState {
 				commit_infos: vec![],
@@ -297,6 +302,21 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			}
 		},
 		KeyEvent { code: Char('h'), .. } => app.state.popup = Some(make_log_help_text()),
+		KeyEvent { code: Char('x'), .. } => {
+			app.teardown();
+			let commit_id = app.commit_id.to_string();
+			let mut args = vec!["log", commit_id.as_str()];
+			match app.state.log_mode {
+				LogMode::Short => {
+					args.push("--pretty=format:%C(yellow)%h%Creset %Cgreen(%cd) %C(bold blue)%aN%Creset %C(red)%d%Creset%n\t%s");
+				},
+				LogMode::Medium => {},
+				LogMode::Long => {
+					args.push("--stat");
+				},
+			}
+			Command::new("git").args(args).exec();
+		},
 		KeyEvent {
 			code: Char('q') | KeyCode::Esc,
 			..
@@ -345,6 +365,7 @@ fn make_log_help_text() -> Text<'static> {
 		"g  home     first commit",
 		"",
 		"enter       show commit",
+		"x           exec git log",
 	];
 	(help.drain(..).map(Line::from).collect::<Vec<_>>()).into()
 }

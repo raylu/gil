@@ -42,7 +42,7 @@ fn main() {
 	};
 
 	let term = terminal::setup().unwrap();
-	let mut app = terminal::App::new(term, &repo, revwalk, decorations, args.show);
+	let mut app = terminal::App::new(term, &repo, revwalk, decorations, args.commit_id, args.show);
 	let res = app.run_app();
 
 	app.teardown();
