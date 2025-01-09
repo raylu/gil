@@ -41,11 +41,11 @@ fn main() {
 		},
 	};
 
-	let app = terminal::App::new(&repo, revwalk, decorations, args.show);
-	let mut term = terminal::setup().unwrap();
-	let res = terminal::run_app(&mut term, app);
+	let term = terminal::setup().unwrap();
+	let mut app = terminal::App::new(term, &repo, revwalk, decorations, args.show);
+	let res = app.run_app();
 
-	terminal::teardown(&mut term);
+	app.teardown();
 	if let Err(err) = res {
 		println!("{:?}", err)
 	}

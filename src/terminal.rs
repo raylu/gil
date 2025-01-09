@@ -23,12 +23,19 @@ use tui::{
 
 use crate::git::{next_commit, show, CommitInfo, Decorations};
 
+type CrosstermTerm = Terminal<CrosstermBackend<Stdout>>;
+
 pub struct App<'repo> {
+	term: CrosstermTerm,
 	repo: &'repo Repository,
-	commit_infos: Vec<CommitInfo<'repo>>,
 	revwalk: Revwalk<'repo>,
-	decorations: Decorations,
 	show_only: bool,
+	state: AppRenderState<'repo>,
+}
+
+struct AppRenderState<'repo> {
+	commit_infos: Vec<CommitInfo<'repo>>,
+	decorations: Decorations,
 	log_mode: LogMode,
 	log_state: ListState,
 	commit_view: Option<CommitView>,
@@ -48,39 +55,91 @@ struct FileView {
 }
 
 impl App<'_> {
-	pub fn new<'a>(repo: &'a Repository, revwalk: Revwalk<'a>, decorations: Decorations, show_only: bool) -> App<'a> {
+	pub fn new<'a>(
+		term: CrosstermTerm,
+		repo: &'a Repository,
+		revwalk: Revwalk<'a>,
+		decorations: Decorations,
+		show_only: bool,
+	) -> App<'a> {
 		App {
+			term,
 			repo,
-			commit_infos: vec![],
 			revwalk,
-			decorations,
 			show_only,
-			log_mode: LogMode::Short,
-			log_state: ListState::default(),
-			commit_view: None,
-			popup: None,
+			state: AppRenderState {
+				commit_infos: vec![],
+				decorations,
+				log_mode: LogMode::Short,
+				log_state: ListState::default(),
+				commit_view: None,
+				popup: None,
+			},
 		}
 	}
 
+	pub fn run_app(&mut self) -> Result<(), Box<dyn Error>> {
+		loop {
+			let needed = if self.show_only {
+				1
+			} else {
+				let commits_per_window = usize::from(self.term.size()?.height / 2);
+				commits_per_window + self.state.log_state.selected().unwrap_or_default()
+			};
+			while self.state.commit_infos.len() < needed {
+				let commit_info = match next_commit(self.repo, &mut self.revwalk) {
+					Ok(None) => break,
+					Ok(Some(ci)) => ci,
+					Err(err) => {
+						self.state.popup = Some(err.message().to_owned().into());
+						break;
+					},
+				};
+				self.state.commit_infos.push(commit_info);
+			}
+
+			if self.show_only && self.state.commit_view.is_none() {
+				self.show_commit(0);
+			}
+
+			self.term.draw(|frame| ui(frame, &mut self.state))?;
+			if let Event::Key(key) = event::read()? {
+				match handle_input(&key, self, &self.term.size()?) {
+					Ok(false) => {
+						return Ok(());
+					},
+					Ok(true) => {}, // ignored
+					Err(err) => self.state.popup = Some(format!("{}", err).into()),
+				}
+			}
+		}
+	}
+
+	pub fn teardown(&mut self) {
+		_ = disable_raw_mode();
+		_ = execute!(self.term.backend_mut(), LeaveAlternateScreen);
+		_ = self.term.show_cursor();
+	}
+
 	fn show_commit(&mut self, index: usize) {
-		self.commit_view = Some(CommitView {
+		self.state.commit_view = Some(CommitView {
 			index,
 			message_scroll: 0,
 			files_state: ListState::default(),
 			file_view: None,
 		});
 
-		let commit = &self.commit_infos[index];
+		let commit = &self.state.commit_infos[index];
 		if commit.patch.deltas().len() > 0 {
 			// immediately show the first file
-			self.commit_view.as_mut().unwrap().files_state.select_first();
+			self.state.commit_view.as_mut().unwrap().files_state.select_first();
 			self.show_commit_file(0);
 		}
 	}
 
 	fn show_commit_file(&mut self, index: usize) {
-		let show_commit = self.commit_view.as_mut().unwrap();
-		show_commit.show_file(self.repo, &self.commit_infos, index);
+		let show_commit = self.state.commit_view.as_mut().unwrap();
+		show_commit.show_file(self.repo, &self.state.commit_infos, index);
 	}
 }
 
@@ -107,8 +166,6 @@ enum LogMode {
 	Long,
 }
 
-type CrosstermTerm = Terminal<CrosstermBackend<Stdout>>;
-
 pub fn setup() -> Result<CrosstermTerm, Box<dyn Error>> {
 	enable_raw_mode()?;
 	let mut stdout = io::stdout();
@@ -117,66 +174,23 @@ pub fn setup() -> Result<CrosstermTerm, Box<dyn Error>> {
 	Ok(Terminal::new(backend)?)
 }
 
-pub fn teardown(terminal: &mut CrosstermTerm) {
-	_ = disable_raw_mode();
-	_ = execute!(terminal.backend_mut(), LeaveAlternateScreen);
-	_ = terminal.show_cursor();
-}
-
-pub fn run_app(terminal: &mut CrosstermTerm, mut app: App) -> Result<(), Box<dyn Error>> {
-	loop {
-		let needed = if app.show_only {
-			1
-		} else {
-			let commits_per_window = usize::from(terminal.size()?.height / 2);
-			commits_per_window + app.log_state.selected().unwrap_or_default()
-		};
-		while app.commit_infos.len() < needed {
-			let commit_info = match next_commit(app.repo, &mut app.revwalk) {
-				Ok(None) => break,
-				Ok(Some(ci)) => ci,
-				Err(err) => {
-					app.popup = Some(err.message().to_owned().into());
-					break;
-				},
-			};
-			app.commit_infos.push(commit_info);
-		}
-
-		if app.show_only && app.commit_view.is_none() {
-			app.show_commit(0);
-		}
-
-		terminal.draw(|frame| ui(frame, &mut app))?;
-		if let Event::Key(key) = event::read()? {
-			match handle_input(&key, &mut app, &terminal.size()?) {
-				Ok(false) => {
-					return Ok(());
-				},
-				Ok(true) => {}, // ignored
-				Err(err) => app.popup = Some(format!("{}", err).into()),
-			}
-		}
-	}
-}
-
 // returns whether to continue running the app
 fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool, Box<dyn Error>> {
-	if app.popup.is_some() {
+	if app.state.popup.is_some() {
 		// clear the popup on any key press
-		app.popup = None;
+		app.state.popup = None;
 		return Ok(true);
 	}
 
-	if let Some(ref mut show_commit) = app.commit_view {
+	if let Some(ref mut show_commit) = app.state.commit_view {
 		match key {
 			KeyEvent { code: Char('n'), .. } => {
-				let max = app.commit_infos[show_commit.index].num_files - 1;
+				let max = app.state.commit_infos[show_commit.index].num_files - 1;
 				let index = scroll(&mut show_commit.files_state, 1, Some(max));
 				app.show_commit_file(index);
 			},
 			KeyEvent { code: Char('p'), .. } => {
-				let max = app.commit_infos[show_commit.index].num_files - 1;
+				let max = app.state.commit_infos[show_commit.index].num_files - 1;
 				let index = scroll(&mut show_commit.files_state, -1, Some(max));
 				app.show_commit_file(index);
 			},
@@ -209,7 +223,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 					-i16::try_from(term_size.height / 2).unwrap(),
 				);
 			},
-			KeyEvent { code: Char('h'), .. } => app.popup = Some(make_commit_help_text()),
+			KeyEvent { code: Char('h'), .. } => app.state.popup = Some(make_commit_help_text()),
 			KeyEvent {
 				code: Char('q') | KeyCode::Esc,
 				..
@@ -217,7 +231,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 				if app.show_only {
 					return Ok(false);
 				}
-				app.commit_view = None;
+				app.state.commit_view = None;
 			},
 			_ => {}, // ignored
 		}
@@ -230,51 +244,59 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 			code: Char('j') | KeyCode::Down,
 			..
 		} => {
-			scroll(&mut app.log_state, 1, None);
+			scroll(&mut app.state.log_state, 1, None);
 		},
 		KeyEvent {
 			code: Char('k') | KeyCode::Up,
 			..
 		} => {
-			scroll(&mut app.log_state, -1, None);
+			scroll(&mut app.state.log_state, -1, None);
 		},
 		KeyEvent { code: Char('d'), .. }
 		| KeyEvent {
 			code: KeyCode::PageDown,
 			..
 		} => {
-			scroll(&mut app.log_state, (term_size.height / 4).try_into().unwrap(), None);
+			scroll(
+				&mut app.state.log_state,
+				(term_size.height / 4).try_into().unwrap(),
+				None,
+			);
 		},
 		KeyEvent { code: Char('u'), .. }
 		| KeyEvent {
 			code: KeyCode::PageUp, ..
 		} => {
-			scroll(&mut app.log_state, -i16::try_from(term_size.height / 4).unwrap(), None);
+			scroll(
+				&mut app.state.log_state,
+				-i16::try_from(term_size.height / 4).unwrap(),
+				None,
+			);
 		},
 		KeyEvent { code: Char('g'), .. }
 		| KeyEvent {
 			code: KeyCode::Home, ..
 		} => {
-			app.log_state.select_first();
+			app.state.log_state.select_first();
 		},
 		// other interactions
 		KeyEvent { code: Char('1'), .. } => {
-			app.log_mode = LogMode::Short;
+			app.state.log_mode = LogMode::Short;
 		},
 		KeyEvent { code: Char('2'), .. } => {
-			app.log_mode = LogMode::Medium;
+			app.state.log_mode = LogMode::Medium;
 		},
 		KeyEvent { code: Char('3'), .. } => {
-			app.log_mode = LogMode::Long;
+			app.state.log_mode = LogMode::Long;
 		},
 		KeyEvent {
 			code: KeyCode::Enter, ..
 		} => {
-			if let Some(index) = app.log_state.selected() {
+			if let Some(index) = app.state.log_state.selected() {
 				app.show_commit(index);
 			}
 		},
-		KeyEvent { code: Char('h'), .. } => app.popup = Some(make_log_help_text()),
+		KeyEvent { code: Char('h'), .. } => app.state.popup = Some(make_log_help_text()),
 		KeyEvent {
 			code: Char('q') | KeyCode::Esc,
 			..
@@ -345,7 +367,7 @@ fn make_commit_help_text() -> Text<'static> {
 	(help.drain(..).map(Line::from).collect::<Vec<_>>()).into()
 }
 
-fn ui(frame: &mut Frame, app: &mut App) {
+fn ui(frame: &mut Frame, state: &mut AppRenderState) {
 	let area = Rect::new(
 		frame.area().x,
 		frame.area().y,
@@ -354,17 +376,18 @@ fn ui(frame: &mut Frame, app: &mut App) {
 	);
 
 	let highlight_style = Style::default().bg(Color::Indexed(237)); // 232 is black, 255 is white; 237 is dark gray
-	match app.commit_view {
+	match state.commit_view {
 		None => {
 			// log view
 			let commit_list = List::new(
-				app.commit_infos
+				state
+					.commit_infos
 					.iter()
-					.map(|ci| commit_info_to_item(ci, &app.log_mode, &app.decorations, area.width)),
+					.map(|ci| commit_info_to_item(ci, &state.log_mode, &state.decorations, area.width)),
 			)
 			.highlight_style(highlight_style)
 			.scroll_padding(5);
-			frame.render_stateful_widget(commit_list, area, &mut app.log_state);
+			frame.render_stateful_widget(commit_list, area, &mut state.log_state);
 		},
 		Some(ref mut show_commit) => {
 			// show view
@@ -381,7 +404,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 				.direction(Direction::Vertical)
 				.constraints(Constraint::from_percentages([50, 50]))
 				.split(commit_and_patch[0]);
-			let commit = &app.commit_infos[show_commit.index];
+			let commit = &state.commit_infos[show_commit.index];
 
 			let commit_message = Paragraph::new(commit.message.as_str())
 				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()))
@@ -420,7 +443,7 @@ fn ui(frame: &mut Frame, app: &mut App) {
 		},
 	}
 
-	if let Some(popup) = &app.popup {
+	if let Some(popup) = &state.popup {
 		let paragraph = Paragraph::new(popup.clone()).wrap(Wrap { trim: false });
 		let area = centered_rect(80, 80, frame.area());
 		frame.render_widget(Clear, area);
