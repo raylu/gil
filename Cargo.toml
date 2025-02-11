@@ -19,7 +19,7 @@ git2 = { version = "0.19", default-features = false }
 textwrap = { version = "0", default-features = false, features = ["unicode-linebreak", "unicode-width"]}
 tui = { package = "ratatui", features = ["unstable-rendered-line-info"], version = "0.29" }
 [patch.crates-io]
-ratatui = { git = "https://github.com/raylu/ratatui", rev = "d5769efc34bb8bd3a0f0a3044954912dba07fc0f", version = "0.29" }
+ratatui = { git = "https://github.com/raylu/ratatui", rev = "d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb", version = "0.29" }
 
 [lints.clippy]
 needless_return = "allow"

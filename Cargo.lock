@@ -1169,7 +1169,7 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 [[package]]
 name = "ratatui"
 version = "0.29.0"
-source = "git+https://github.com/raylu/ratatui?rev=d5769efc34bb8bd3a0f0a3044954912dba07fc0f#d5769efc34bb8bd3a0f0a3044954912dba07fc0f"
+source = "git+https://github.com/raylu/ratatui?rev=d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb#d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb"
 dependencies = [
  "indoc",
  "instability",
@@ -1186,7 +1186,7 @@ dependencies = [
 [[package]]
 name = "ratatui-core"
 version = "0.3.0"
-source = "git+https://github.com/raylu/ratatui?rev=d5769efc34bb8bd3a0f0a3044954912dba07fc0f#d5769efc34bb8bd3a0f0a3044954912dba07fc0f"
+source = "git+https://github.com/raylu/ratatui?rev=d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb#d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb"
 dependencies = [
  "bitflags 2.6.0",
  "cassowary",
@@ -1204,7 +1204,7 @@ dependencies = [
 [[package]]
 name = "ratatui-crossterm"
 version = "0.1.0"
-source = "git+https://github.com/raylu/ratatui?rev=d5769efc34bb8bd3a0f0a3044954912dba07fc0f#d5769efc34bb8bd3a0f0a3044954912dba07fc0f"
+source = "git+https://github.com/raylu/ratatui?rev=d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb#d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb"
 dependencies = [
  "crossterm",
  "instability",
@@ -1214,7 +1214,7 @@ dependencies = [
 [[package]]
 name = "ratatui-termwiz"
 version = "0.1.0"
-source = "git+https://github.com/raylu/ratatui?rev=d5769efc34bb8bd3a0f0a3044954912dba07fc0f#d5769efc34bb8bd3a0f0a3044954912dba07fc0f"
+source = "git+https://github.com/raylu/ratatui?rev=d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb#d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb"
 dependencies = [
  "ratatui-core",
  "termwiz",
@@ -1223,7 +1223,7 @@ dependencies = [
 [[package]]
 name = "ratatui-widgets"
 version = "0.3.0"
-source = "git+https://github.com/raylu/ratatui?rev=d5769efc34bb8bd3a0f0a3044954912dba07fc0f#d5769efc34bb8bd3a0f0a3044954912dba07fc0f"
+source = "git+https://github.com/raylu/ratatui?rev=d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb#d54f0fbccfc9611585d40c1af25d9cb7bd11a7cb"
 dependencies = [
  "bitflags 2.6.0",
  "indoc",
