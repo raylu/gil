@@ -409,6 +409,22 @@ fn ui(frame: &mut Frame, state: &mut AppRenderState) {
 			.highlight_style(highlight_style)
 			.scroll_padding(5);
 			frame.render_stateful_widget(commit_list, area, &mut state.log_state);
+
+			let bottom_color = Color::Indexed(245);
+			let mut modes = vec![
+				"[1] short ".fg(bottom_color),
+				"[2] regular ".fg(bottom_color),
+				"[3] stat".fg(bottom_color),
+			];
+			match state.log_mode {
+				LogMode::Short => modes[0] = modes[0].clone().bold().white(),
+				LogMode::Medium => modes[1] = modes[1].clone().bold().white(),
+				LogMode::Long => modes[2] = modes[2].clone().bold().white(),
+			}
+			let bottom_line = Line::from(modes);
+			let bottom_area = Rect::new(frame.area().x, frame.area().height - 1, frame.area().width, 1);
+			frame.render_widget(Clear, bottom_area);
+			frame.render_widget(Paragraph::new(bottom_line), bottom_area);
 		},
 		Some(ref mut show_commit) => {
 			// show view
