@@ -40,7 +40,7 @@ pub fn next_commit<'repo>(
 	};
 	let commit = repo.find_commit(commit_id)?;
 	let author = commit.author();
-	let time = match chrono::DateTime::from_timestamp(commit.time().seconds(), 0) {
+	let time = match chrono::DateTime::from_timestamp(author.when().seconds(), 0) {
 		Some(dt) => format!("{}", dt.with_timezone(&chrono::Local).format("%c")),
 		None => "".to_string(),
 	};
