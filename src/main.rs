@@ -1,4 +1,4 @@
-use git2::{Oid, Repository};
+use git2::Repository;
 use std::env;
 
 mod git;
@@ -18,18 +18,18 @@ fn main() {
 			return;
 		},
 	};
-	let args = match parse_args(&repo, &argv[1..]) {
-		Ok(commit_id) => commit_id,
+	let args = match parse_args(&argv[1..]) {
+		Ok(args) => args,
 		Err(err) => {
 			println!("couldn't get commit: {}", err.message());
 			return;
 		},
 	};
 
-	let revwalk = match git::log(&repo, args.commit_id) {
+	let revwalk = match git::log(&repo, &args.revision_range) {
 		Ok(revwalk) => revwalk,
 		Err(err) => {
-			println!("couldn't log {}: {}", args.commit_id, err.message());
+			println!("couldn't log {}: {}", args.revision_range, err.message());
 			return;
 		},
 	};
@@ -42,7 +42,7 @@ fn main() {
 	};
 
 	let term = terminal::setup().unwrap();
-	let mut app = terminal::App::new(term, &repo, revwalk, decorations, args.commit_id, args.show);
+	let mut app = terminal::App::new(term, &repo, revwalk, decorations, args.revision_range, args.show);
 	let res = app.run_app();
 
 	app.teardown();
@@ -52,18 +52,18 @@ fn main() {
 }
 
 struct Args {
-	commit_id: Oid,
+	revision_range: String,
 	show: bool,
 }
 
-fn parse_args(repo: &Repository, args: &[String]) -> Result<Args, git2::Error> {
+fn parse_args(args: &[String]) -> Result<Args, git2::Error> {
 	let mut show = false;
-	let mut commit_id: Option<Oid> = None;
+	let mut revision_range = None;
 	for arg in args {
 		if arg == "--show" {
 			show = true;
-		} else if commit_id.is_none() {
-			commit_id = Some(repo.revparse_single(arg)?.id())
+		} else if revision_range.is_none() {
+			revision_range = Some(arg.as_str())
 		} else {
 			return Err(git2::Error::new(
 				git2::ErrorCode::GenericError,
@@ -72,15 +72,8 @@ fn parse_args(repo: &Repository, args: &[String]) -> Result<Args, git2::Error> {
 			));
 		}
 	}
-	if commit_id.is_none() {
-		commit_id = Some(repo.head()?.target().ok_or(git2::Error::new(
-			git2::ErrorCode::GenericError,
-			git2::ErrorClass::None,
-			"couldn't resolve HEAD",
-		))?);
-	}
 	Ok(Args {
-		commit_id: commit_id.unwrap(),
+		revision_range: revision_range.unwrap_or("HEAD").to_string(),
 		show,
 	})
 }

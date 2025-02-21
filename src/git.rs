@@ -24,9 +24,13 @@ pub struct CommitInfo<'repo> {
 	pub num_files: usize,
 }
 
-pub fn log(repo: &Repository, commit_id: Oid) -> Result<Revwalk, git2::Error> {
+pub fn log<'repo>(repo: &'repo Repository, revision_range: &str) -> Result<Revwalk<'repo>, git2::Error> {
 	let mut revwalk = repo.revwalk()?;
-	revwalk.push(commit_id)?;
+	if revision_range.contains("..") {
+		revwalk.push_range(revision_range)?;
+	} else {
+		revwalk.push(repo.revparse_single(revision_range)?.id())?;
+	}
 	return Ok(revwalk);
 }
 

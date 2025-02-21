@@ -7,7 +7,7 @@ use crossterm::{
 	execute,
 	terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use git2::{BranchType, Oid, Repository, Revwalk};
+use git2::{BranchType, Repository, Revwalk};
 use std::{
 	error::Error,
 	io::{self, Stdout},
@@ -31,7 +31,7 @@ pub struct App<'repo> {
 	term: CrosstermTerm,
 	repo: &'repo Repository,
 	revwalk: Revwalk<'repo>,
-	commit_id: Oid,
+	revision_range: String,
 	show_only: bool,
 	state: AppRenderState<'repo>,
 }
@@ -63,14 +63,14 @@ impl App<'_> {
 		repo: &'a Repository,
 		revwalk: Revwalk<'a>,
 		decorations: Decorations,
-		commit_id: Oid,
+		revision_range: String,
 		show_only: bool,
 	) -> App<'a> {
 		App {
 			term,
 			repo,
 			revwalk,
-			commit_id,
+			revision_range,
 			show_only,
 			state: AppRenderState {
 				commit_infos: vec![],
@@ -304,8 +304,7 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 		KeyEvent { code: Char('h'), .. } => app.state.popup = Some(make_log_help_text()),
 		KeyEvent { code: Char('x'), .. } => {
 			app.teardown();
-			let commit_id = app.commit_id.to_string();
-			let mut args = vec!["log", commit_id.as_str()];
+			let mut args = vec!["log", app.revision_range.as_str()];
 			match app.state.log_mode {
 				LogMode::Short => {
 					args.push("--pretty=format:%C(yellow)%h%Creset %Cgreen(%cd) %C(bold blue)%aN%Creset %C(red)%d%Creset%n\t%s");
