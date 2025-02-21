@@ -315,7 +315,8 @@ fn handle_input(key: &KeyEvent, app: &mut App, term_size: &Size) -> Result<bool,
 					args.push("--stat");
 				},
 			}
-			Command::new("git").args(args).exec();
+			let err = Command::new("git").args(&args).exec();
+			panic!("failed to run `git {}`:\n\t{}", args.join(" "), err);
 		},
 		KeyEvent {
 			code: Char('q') | KeyCode::Esc,
