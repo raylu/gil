@@ -428,29 +428,21 @@ fn ui(frame: &mut Frame, state: &mut AppRenderState) {
 		},
 		Some(ref mut show_commit) => {
 			// show view
-			let cap_direction = if area.width / 2 > area.height {
-				Direction::Horizontal
+			let cap_direction;
+			let message_width;
+			if area.width / 2 > area.height {
+				cap_direction = Direction::Horizontal;
+				message_width = area.width;
 			} else {
-				Direction::Vertical
+				cap_direction = Direction::Vertical;
+				message_width = area.width / 2;
 			};
-			let commit_and_patch = Layout::default()
-				.constraints(Constraint::from_percentages([50, 50]))
-				.direction(cap_direction)
-				.split(area);
-			let message_and_files = Layout::default()
-				.direction(Direction::Vertical)
-				.constraints(Constraint::from_percentages([50, 50]))
-				.split(commit_and_patch[0]);
-			let commit = &state.commit_infos[show_commit.index];
 
+			let commit = &state.commit_infos[show_commit.index];
 			let commit_message = Paragraph::new(commit.message.as_str())
 				.block(Block::bordered().title(commit.commit_id.to_string()).title_style(Style::new().yellow()))
 				.wrap(Wrap { trim: false });
-			let line_count: u16 = commit_message.line_count(message_and_files[0].width).try_into().unwrap_or(u16::MAX);
-			show_commit.message_scroll =
-				show_commit.message_scroll.min(line_count.saturating_sub(message_and_files[0].height));
-			let commit_message = commit_message.scroll((show_commit.message_scroll, 0));
-			frame.render_widget(commit_message, message_and_files[0]);
+			let commit_message_height: u16 = commit_message.line_count(message_width).try_into().unwrap_or(u16::MAX);
 
 			let mut commit_file_items = vec![];
 			for delta in commit.patch.deltas() {
@@ -465,7 +457,27 @@ fn ui(frame: &mut Frame, state: &mut AppRenderState) {
 				}
 				commit_file_items.push(filename);
 			}
+			let num_files = u16::try_from(commit_file_items.len()).unwrap_or(u16::MAX);
 			let commit_files = List::new(commit_file_items).highlight_style(highlight_style);
+
+			let cap_constraints = if cap_direction == Direction::Horizontal {
+				[Constraint::Percentage(50), Constraint::Percentage(50)]
+			} else {
+				let cap_height = commit_message_height.saturating_add(num_files).saturating_add(2); // add 2 for visual padding
+				[Constraint::Max(cap_height.min(area.height / 2)), Constraint::Fill(1)]
+			};
+			let commit_and_patch = Layout::default().constraints(cap_constraints).direction(cap_direction).split(area);
+			let message_and_files = Layout::default()
+				.direction(Direction::Vertical)
+				.constraints([
+					Constraint::Max(commit_message_height.min(commit_and_patch[0].height)),
+					Constraint::Fill(1),
+				])
+				.split(commit_and_patch[0]);
+			show_commit.message_scroll =
+				show_commit.message_scroll.min(commit_message_height.saturating_sub(message_and_files[0].height));
+			let commit_message = commit_message.scroll((show_commit.message_scroll, 0));
+			frame.render_widget(commit_message, message_and_files[0]);
 			frame.render_stateful_widget(commit_files, message_and_files[1], &mut show_commit.files_state);
 
 			if let Some(show_file) = &mut show_commit.file_view {
